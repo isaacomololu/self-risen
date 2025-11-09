@@ -42,8 +42,8 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Install Prisma CLI for migrations (matching project version)
-RUN npm install -g prisma@6.3.0
+# Setup pnpm and install Prisma CLI for migrations (matching project version)
+RUN pnpm setup && pnpm add -g prisma@6.3.0
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
