@@ -48,10 +48,16 @@ COPY package.json pnpm-lock.yaml ./
 # Install only production dependencies (Prisma is already in dependencies)
 RUN pnpm install --prod --frozen-lockfile
 
-# Copy Prisma schema and generated client
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+# Copy Prisma schema
 COPY prisma ./prisma
+
+# Generate Prisma Client in production stage (more reliable than copying)
+RUN pnpm prisma generate
+
+# Run migrations if DATABASE_URL is provided as build arg
+# Note: For most platforms, migrations run at startup (see CMD), but this allows pre-migration during build
+ARG DATABASE_URL
+RUN if [ -n "$DATABASE_URL" ]; then pnpm prisma migrate deploy; fi
 
 # Copy built application
 COPY --from=build /app/dist ./dist
