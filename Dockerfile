@@ -31,11 +31,11 @@ COPY . .
 # Generate Prisma Client
 RUN pnpm prisma generate
 
-# Build the application
-RUN pnpm build
+# Clean any existing dist and build the application
+RUN rm -rf dist && pnpm build
 
-# Verify dist was created
-RUN ls -la dist/ || (echo "ERROR: dist folder not created!" && exit 1)
+# Verify dist was created with compiled JavaScript files
+RUN ls -la dist/ && test -f dist/main.js || (echo "ERROR: dist/main.js not found after build!" && ls -la dist/ && exit 1)
 
 # Stage 3: Production
 FROM node:20-alpine AS production
