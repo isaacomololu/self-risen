@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid(4))
+  firebaseId      String    @unique
+  name            String
+  username        String?
+  // password        String
+  email           String    @unique
+  phone           String    @unique
+  address         String
+  avatar          String?
+  fcmTokens       String[]  @default([])
+  lastLoggedInAt  DateTime?
+  lastLoggedOutAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model RefreshToken {
+  token      String   @unique
+  userId     String   @unique
+  expiryDate DateTime
+  createdAt  DateTime @default(now())
+}
+
+model ResetToken {
+  token      String   @unique
+  userId     String   @unique
+  expiryDate DateTime
+  createdAt  DateTime @default(now())
+}
+
+enum Status {
+  UPCOMING
+  TODAY
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationChannelType {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+model Notification {
+  id                String                    @id @default(uuid())
+  type              String
+  title             String
+  body              String
+  channels          NotificationChannelType[]
+  generatedByUserId String?
+  meta              Json                      @default("{}")
+  estateId          String?
+  iconUrl           String?
+  resourceId        String?
+  resourceType      String?
+  deepLink          String?
+  requestId         String                    @unique
+  recipients        NotificationRecipient[]
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@index([requestId])
+  @@index([type])
+  @@index([generatedByUserId])
+}
+
+model NotificationRecipient {
+  id             String       @id @default(uuid())
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  recipientId    String
+  isRead         Boolean      @default(false)
+  isDismissed    Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt])
+  @@index([notificationId])
+}
+
+model NotificationAuditLog {
+  id               String                  @id @default(uuid())
+  requestId        String
+  type             String // USER | EXTERNAL
+  notificationType String
+  recipientId      String
+  channel          NotificationChannelType
+  provider         String
+  status           NotificationStatus
+  error            String?
+  metadata         Json                    @default("{}")
+  sentAt           DateTime?
+  createdAt        DateTime                @default(now())
+
+  @@index([recipientId, notificationType, createdAt])
+  @@index([requestId, channel])
+  @@index([status, createdAt])
+  @@index([recipientId, createdAt])
+}
+
+model NotificationDeadLetterQueue {
+  id               String                  @id @default(uuid())
+  requestId        String
+  notificationId   String
+  userId           String?
+  channel          NotificationChannelType
+  recipient        String
+  notificationType String
+  attempts         Int
+  lastError        String
+  jobData          Json                    @default("{}")
+  failedAt         DateTime                @default(now())
+  createdAt        DateTime                @default(now())
+
+  @@index([requestId])
+  @@index([userId])
+  @@index([failedAt])
+  @@index([notificationId])
+}

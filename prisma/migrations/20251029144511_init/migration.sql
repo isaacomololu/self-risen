@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "userName" DROP NOT NULL,
+ALTER COLUMN "avatar" DROP NOT NULL;

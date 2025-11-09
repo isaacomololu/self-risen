@@ -1,0 +1,2 @@
+Welcome to ${appName}! Thank you for joining us, ${userName}!
+

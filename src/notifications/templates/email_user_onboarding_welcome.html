@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+        background-color: #f4f4f4;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #ffffff;
+      }
+      .header {
+        background-color: #4caf50;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        border-radius: 5px 5px 0 0;
+      }
+      .content {
+        padding: 20px;
+        background-color: #ffffff;
+      }
+      .button {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #4caf50;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .footer {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Welcome to ${appName}!</h1>
+      </div>
+      <div class="content">
+        <p>Hi ${userName},</p>
+        <p>Thank you for joining us. We're excited to have you on board!</p>
+        <p>
+          Your account has been successfully created with the email: ${email}
+        </p>
+        <p>
+          If you have any questions, feel free to reach out to our support team.
+        </p>
+        <p>Best regards,<br />${appName} Team</p>
+      </div>
+      <div class="footer">
+        <p>&copy; ${currentYear} ${appName}. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>

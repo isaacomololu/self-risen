@@ -1,0 +1,1 @@
+export { ChangeNameDto } from './change-name.dto'
