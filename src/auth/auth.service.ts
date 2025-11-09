@@ -21,7 +21,28 @@ export class AuthService extends BaseService {
   }
 
   async signUp(payload: SignUp) {
-    const { name, email, password, phone, address } = payload;
+    const { name, email, password, phone } = payload;
+
+    // Verify Firebase is initialized
+    const firebaseApp = auth().app;
+    if (!firebaseApp) {
+      throw new Error('Firebase Admin SDK is not initialized');
+    }
+    console.log('Firebase app name:', firebaseApp.name);
+    console.log('Firebase project ID:', firebaseApp.options.projectId);
+    console.log('Firebase has credential:', !!firebaseApp.options.credential);
+    
+    // Try to get access token to verify credential is working
+    try {
+      if (firebaseApp.options.credential) {
+        const token = await firebaseApp.options.credential.getAccessToken();
+        console.log('✓ Credential is working - got access token');
+      } else {
+        console.error('✗ Firebase app has no credential attached!');
+      }
+    } catch (err) {
+      console.error('✗ Failed to get access token from Firebase app credential:', err.message);
+    }
 
     let firebaseUser: auth.UserRecord;
     try {
@@ -44,7 +65,7 @@ export class AuthService extends BaseService {
       }
       if (error.code === 'auth/weak-password') {
         return this.HandleError(
-          new ConflictException('Password is too weak')
+          new ConflictException('Password is too weak. Please use a password with at least 6 characters.')
         );
       }
       return this.HandleError(error);
@@ -57,7 +78,6 @@ export class AuthService extends BaseService {
           email,
           name,
           phone,
-          address,
           lastLoggedInAt: new Date()
         }
       });

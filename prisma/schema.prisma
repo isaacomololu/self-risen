@@ -21,47 +21,12 @@ model User {
   // password        String
   email           String    @unique
   phone           String    @unique
-  address         String
   avatar          String?
   fcmTokens       String[]  @default([])
   lastLoggedInAt  DateTime?
   lastLoggedOutAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-}
-
-model RefreshToken {
-  token      String   @unique
-  userId     String   @unique
-  expiryDate DateTime
-  createdAt  DateTime @default(now())
-}
-
-model ResetToken {
-  token      String   @unique
-  userId     String   @unique
-  expiryDate DateTime
-  createdAt  DateTime @default(now())
-}
-
-enum Status {
-  UPCOMING
-  TODAY
-  COMPLETED
-  CANCELLED
-}
-
-enum NotificationChannelType {
-  EMAIL
-  SMS
-  PUSH
-  IN_APP
-}
-
-enum NotificationStatus {
-  QUEUED
-  SENT
-  FAILED
 }
 
 model Notification {
@@ -139,4 +104,17 @@ model NotificationDeadLetterQueue {
   @@index([userId])
   @@index([failedAt])
   @@index([notificationId])
+}
+
+enum NotificationChannelType {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
 }

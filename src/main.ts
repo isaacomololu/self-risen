@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { config, setupConfig } from './common';
 import * as dotenv from 'dotenv';
+import * as admin from 'firebase-admin';
 
 // Load environment variables
 dotenv.config();
@@ -12,6 +13,30 @@ async function bootstrap() {
   try {
     const error = await setupConfig();
     if (error) throw error;
+
+    // Initialize Firebase Admin SDK BEFORE NestJS app starts
+    // This ensures our credentials are used when the @alpha018/nestjs-firebase-auth module checks for existing apps
+    if (config.FIREBASE_PROJECT_ID && config.FIREBASE_PRIVATE_KEY && config.FIREBASE_CLIENT_EMAIL) {
+      // Only initialize if not already initialized
+      if (admin.apps.length === 0) {
+        console.log('Initializing Firebase Admin SDK directly with credentials...');
+        const credentials = {
+          projectId: config.FIREBASE_PROJECT_ID,
+          privateKey: config.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          clientEmail: config.FIREBASE_CLIENT_EMAIL,
+          ...(config.FIREBASE_PRIVATE_KEY_ID && { privateKeyId: config.FIREBASE_PRIVATE_KEY_ID }),
+          ...(config.FIREBASE_CLIENT_ID && { clientId: config.FIREBASE_CLIENT_ID }),
+        };
+
+        admin.initializeApp({
+          credential: admin.credential.cert(credentials),
+          projectId: config.FIREBASE_PROJECT_ID,
+        });
+        console.log('✓ Firebase Admin SDK initialized successfully with credentials');
+      } else {
+        console.log('Firebase Admin SDK already initialized, using existing app');
+      }
+    }
 
     const app = await NestFactory.create(AppModule, { snapshot: true });
     app.enableCors();

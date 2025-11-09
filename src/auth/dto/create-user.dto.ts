@@ -34,9 +34,4 @@ export class SignUp {
         message: 'Phone number must be in E.164 format (e.g., +1234567890)'
     })
     phone: string;
-
-    @ApiProperty({ required: true })
-    @IsNotEmpty()
-    @IsString()
-    address: string;
 }

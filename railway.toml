@@ -1,0 +1,18 @@
+# Railway configuration file
+# This file helps Railway understand your project structure
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "node dist/main.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Health check configuration
+[deploy.healthcheck]
+path = "/"
+timeout = 100
+interval = 10
+

@@ -65,9 +65,22 @@ class Config {
     @IsString()
     FRONTEND_URL: string;
 
-    // @IsNotEmpty()
-    // @IsString()
-    // FIREBASE_CREDENTIALS: string;
+    // Firebase Configuration
+    @IsNotEmpty()
+    @IsString()
+    FIREBASE_PROJECT_ID: string;
+
+    @IsNotEmpty()
+    @IsString()
+    FIREBASE_PRIVATE_KEY: string;
+
+    @IsNotEmpty()
+    @IsString()
+    FIREBASE_CLIENT_EMAIL: string;
+
+    // Optional Firebase fields (have defaults)
+    FIREBASE_PRIVATE_KEY_ID?: string;
+    FIREBASE_CLIENT_ID?: string;
 
     // Redis Configuration
     REDIS_HOST?: string;
