@@ -86,22 +86,22 @@ export class AuthService extends BaseService {
       });
 
       // Send onboarding welcome notification
-      try {
-        await this.notificationService.notifyUser({
-          userId: user.id,
-          type: NotificationTypeEnum.USER_ONBOARDING_WELCOME,
-          requestId: `welcome-${user.id}-${Date.now()}`,
-          metadata: {
-            userName: name,
-            appName: 'Self-Risen',
-            email: email,
-            currentYear: new Date().getFullYear(),
-          },
-        });
-      } catch (notificationError) {
-        // Log error but don't fail user creation
-        logger.error(`Failed to send onboarding notification: ${notificationError.message || notificationError}`);
-      }
+      // try {
+      //   await this.notificationService.notifyUser({
+      //     userId: user.id,
+      //     type: NotificationTypeEnum.USER_ONBOARDING_WELCOME,
+      //     requestId: `welcome-${user.id}-${Date.now()}`,
+      //     metadata: {
+      //       userName: name,
+      //       appName: 'Self-Risen',
+      //       email: email,
+      //       currentYear: new Date().getFullYear(),
+      //     },
+      //   });
+      // } catch (notificationError) {
+      //   // Log error but don't fail user creation
+      //   logger.error(`Failed to send onboarding notification: ${notificationError.message || notificationError}`);
+      // }
 
       return this.Results({ 
         user,
