@@ -34,6 +34,9 @@ RUN pnpm prisma generate
 # Build the application
 RUN pnpm build
 
+# Verify dist was created
+RUN ls -la dist/ || (echo "ERROR: dist folder not created!" && exit 1)
+
 # Stage 3: Production
 FROM node:20-alpine AS production
 
@@ -61,6 +64,10 @@ RUN if [ -n "$DATABASE_URL" ]; then pnpm prisma migrate deploy; fi
 
 # Copy built application
 COPY --from=build /app/dist ./dist
+
+# Verify dist was copied and contains main.js (with proper permissions)
+RUN ls -la dist/ && test -f dist/main.js || (echo "ERROR: dist/main.js not found!" && exit 1) && \
+    ls -la dist/main.js
 
 # Copy Firebase credentials if they exist (Railway will handle this via env vars or file mounts)
 COPY firebase-credentials.json* ./
