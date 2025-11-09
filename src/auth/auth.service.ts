@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common';
-import { BaseService } from 'src/common';
+import { BaseService, logger } from 'src/common';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { SignUp, ResetPasswordDto, SetUserNameDto, SendOtpDto, VerifyOtpDto, LoginDto } from './dto';
 import { auth } from 'firebase-admin';
@@ -28,20 +28,20 @@ export class AuthService extends BaseService {
     if (!firebaseApp) {
       throw new Error('Firebase Admin SDK is not initialized');
     }
-    console.log('Firebase app name:', firebaseApp.name);
-    console.log('Firebase project ID:', firebaseApp.options.projectId);
-    console.log('Firebase has credential:', !!firebaseApp.options.credential);
+    logger.log(`Firebase app name: ${firebaseApp.name}`);
+    logger.log(`Firebase project ID: ${firebaseApp.options.projectId}`);
+    logger.log(`Firebase has credential: ${!!firebaseApp.options.credential}`);
     
     // Try to get access token to verify credential is working
     try {
       if (firebaseApp.options.credential) {
         const token = await firebaseApp.options.credential.getAccessToken();
-        console.log('✓ Credential is working - got access token');
+        logger.log('✓ Credential is working - got access token');
       } else {
-        console.error('✗ Firebase app has no credential attached!');
+        logger.error('✗ Firebase app has no credential attached!');
       }
     } catch (err) {
-      console.error('✗ Failed to get access token from Firebase app credential:', err.message);
+      logger.error(`✗ Failed to get access token from Firebase app credential: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     let firebaseUser: auth.UserRecord;
@@ -54,16 +54,19 @@ export class AuthService extends BaseService {
       });
     } catch (error) {
       if (error.code === 'auth/email-already-exists') {
+        logger.error(`User with email ${email} already exists`);
         return this.HandleError(
           new ConflictException('User with this email already exists')
         );
       }
       if (error.code === 'auth/invalid-email') {
+        logger.error(`Invalid email address: ${email}`);
         return this.HandleError(
           new ConflictException('Invalid email address')
         );
       }
       if (error.code === 'auth/weak-password') {
+        logger.error(`Weak password detected for email: ${email}`);
         return this.HandleError(
           new ConflictException('Password is too weak. Please use a password with at least 6 characters.')
         );
@@ -97,7 +100,7 @@ export class AuthService extends BaseService {
         });
       } catch (notificationError) {
         // Log error but don't fail user creation
-        console.error('Failed to send onboarding notification:', notificationError);
+        logger.error(`Failed to send onboarding notification: ${notificationError.message || notificationError}`);
       }
 
       return this.Results({ 
@@ -108,7 +111,7 @@ export class AuthService extends BaseService {
       try {
         await auth().deleteUser(firebaseUser.uid);
       } catch (deleteError) {
-        console.error(`Failed to rollback Firebase user ${firebaseUser.uid}:`, deleteError);
+        logger.error(`Failed to rollback Firebase user ${firebaseUser.uid}: ${deleteError.message || deleteError}`);
       }
       return this.HandleError(error);
     }
