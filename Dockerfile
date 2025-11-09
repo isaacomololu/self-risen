@@ -42,13 +42,10 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Setup pnpm and install Prisma CLI for migrations (matching project version)
-RUN pnpm setup && pnpm add -g prisma@6.3.0
-
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Install only production dependencies
+# Install only production dependencies (Prisma is already in dependencies)
 RUN pnpm install --prod --frozen-lockfile
 
 # Copy Prisma schema and generated client
