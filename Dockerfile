@@ -34,17 +34,11 @@ COPY prisma ./prisma
 RUN pnpm prisma generate
 
 # Clean any existing dist and build the application
-RUN rm -rf dist && \
-    echo "Building application..." && \
-    pnpm build && \
-    echo "Build complete. Checking dist folder..." && \
-    ls -la dist/ && \
-    echo "Looking for main.js..." && \
-    find dist -name "main.js" -o -name "*.js" | head -10
+RUN rm -rf dist && pnpm build
 
-# Verify dist was created with compiled JavaScript files
-RUN test -f dist/main.js || (echo "ERROR: dist/main.js not found after build!" && echo "Contents of dist:" && ls -laR dist/ && exit 1) && \
-    echo "SUCCESS: dist/main.js found!"
+# Verify dist was created with compiled JavaScript files (main.js is in dist/src/)
+RUN test -f dist/src/main.js || (echo "ERROR: dist/src/main.js not found after build!" && exit 1) && \
+    echo "SUCCESS: Build completed successfully!"
 
 # Stage 3: Production
 FROM node:20-alpine AS production
@@ -74,9 +68,8 @@ RUN if [ -n "$DATABASE_URL" ]; then pnpm prisma migrate deploy; fi
 # Copy built application
 COPY --from=build /app/dist ./dist
 
-# Verify dist was copied and contains main.js (with proper permissions)
-RUN ls -la dist/ && test -f dist/main.js || (echo "ERROR: dist/main.js not found!" && exit 1) && \
-    ls -la dist/main.js
+# Verify dist was copied and contains main.js
+RUN test -f dist/src/main.js || (echo "ERROR: dist/src/main.js not found!" && exit 1)
 
 # Copy Firebase credentials if they exist (Railway will handle this via env vars or file mounts)
 COPY firebase-credentials.json* ./
@@ -100,5 +93,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:${PORT}/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
 # Start script that runs migrations then starts the app
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
 
