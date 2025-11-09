@@ -25,17 +25,26 @@ WORKDIR /app
 # Copy dependencies from previous stage
 COPY --from=dependencies /app/node_modules ./node_modules
 
-# Copy source code and config files
-COPY . .
+# Copy source code and config files (exclude dist to avoid conflicts)
+COPY package.json pnpm-lock.yaml tsconfig*.json nest-cli.json ./
+COPY src ./src
+COPY prisma ./prisma
 
 # Generate Prisma Client
 RUN pnpm prisma generate
 
 # Clean any existing dist and build the application
-RUN rm -rf dist && pnpm build
+RUN rm -rf dist && \
+    echo "Building application..." && \
+    pnpm build && \
+    echo "Build complete. Checking dist folder..." && \
+    ls -la dist/ && \
+    echo "Looking for main.js..." && \
+    find dist -name "main.js" -o -name "*.js" | head -10
 
 # Verify dist was created with compiled JavaScript files
-RUN ls -la dist/ && test -f dist/main.js || (echo "ERROR: dist/main.js not found after build!" && ls -la dist/ && exit 1)
+RUN test -f dist/main.js || (echo "ERROR: dist/main.js not found after build!" && echo "Contents of dist:" && ls -laR dist/ && exit 1) && \
+    echo "SUCCESS: dist/main.js found!"
 
 # Stage 3: Production
 FROM node:20-alpine AS production
