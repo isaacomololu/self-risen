@@ -23,26 +23,26 @@ export class AuthService extends BaseService {
   async signUp(payload: SignUp) {
     const { name, email, password, phone } = payload;
 
-    // Verify Firebase is initialized
-    const firebaseApp = auth().app;
-    if (!firebaseApp) {
-      throw new Error('Firebase Admin SDK is not initialized');
-    }
-    logger.log(`Firebase app name: ${firebaseApp.name}`);
-    logger.log(`Firebase project ID: ${firebaseApp.options.projectId}`);
-    logger.log(`Firebase has credential: ${!!firebaseApp.options.credential}`);
+    // // Verify Firebase is initialized
+    // const firebaseApp = auth().app;
+    // if (!firebaseApp) {
+    //   throw new Error('Firebase Admin SDK is not initialized');
+    // }
+    // logger.log(`Firebase app name: ${firebaseApp.name}`);
+    // logger.log(`Firebase project ID: ${firebaseApp.options.projectId}`);
+    // logger.log(`Firebase has credential: ${!!firebaseApp.options.credential}`);
     
     // Try to get access token to verify credential is working
-    try {
-      if (firebaseApp.options.credential) {
-        const token = await firebaseApp.options.credential.getAccessToken();
-        logger.log('✓ Credential is working - got access token');
-      } else {
-        logger.error('✗ Firebase app has no credential attached!');
-      }
-    } catch (err) {
-      logger.error(`✗ Failed to get access token from Firebase app credential: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    // try {
+    //   if (firebaseApp.options.credential) {
+    //     const token = await firebaseApp.options.credential.getAccessToken();
+    //     logger.log('✓ Credential is working - got access token');
+    //   } else {
+    //     logger.error('✗ Firebase app has no credential attached!');
+    //   }
+    // } catch (err) {
+    //   logger.error(`✗ Failed to get access token from Firebase app credential: ${err instanceof Error ? err.message : String(err)}`);
+    // }
 
     let firebaseUser: auth.UserRecord;
     try {
