@@ -21,7 +21,7 @@ export class AuthService extends BaseService {
   }
 
   async signUp(payload: SignUp) {
-    const { name, email, password, phone } = payload;
+    const { name, email, password, avatar } = payload;
 
     // // Verify Firebase is initialized
     // const firebaseApp = auth().app;
@@ -50,7 +50,7 @@ export class AuthService extends BaseService {
         email,
         password,
         displayName: name,
-        phoneNumber: phone,
+        photoURL: avatar,
       });
     } catch (error) {
       if (error.code === 'auth/email-already-exists') {
@@ -80,7 +80,7 @@ export class AuthService extends BaseService {
           firebaseId: firebaseUser.uid,
           email,
           name,
-          phone,
+          avatar,
           lastLoggedInAt: new Date()
         }
       });
