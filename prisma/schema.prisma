@@ -20,7 +20,6 @@ model User {
   username        String?
   // password        String
   email           String    @unique
-  phone           String    @unique
   avatar          String?
   fcmTokens       String[]  @default([])
   lastLoggedInAt  DateTime?

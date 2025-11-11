@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsOptional } from 'class-validator';
 
 export class SignUp {
     @ApiProperty({ required: true })
@@ -22,16 +22,8 @@ export class SignUp {
     @IsString()
     password: string;
 
-    // @ApiProperty({ required: true })
-    // @IsNotEmpty()
-    // @IsString()
-    // avatar: string;
-
     @ApiProperty({ required: true })
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    @Matches(/^\+[1-9]\d{1,14}$/, {
-        message: 'Phone number must be in E.164 format (e.g., +1234567890)'
-    })
-    phone: string;
+    avatar: string;
 }
