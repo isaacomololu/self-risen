@@ -339,68 +339,6 @@ export class AuthService extends BaseService {
     return this.Results(null);
   }
 
-  // async verifyOtp(payload: VerifyOtpDto) {
-  //   const { token, name } = payload;
-
-  //   let verifiedUser: auth.DecodedIdToken;
-  //   try {
-  //     verifiedUser = await auth().verifyIdToken(token, true);
-  //   } catch (error) {
-  //     if (error.code === 'auth/id-token-expired') {
-  //       return this.HandleError(
-  //         new UnauthorizedException('Token has expired')
-  //       );
-  //     }
-  //     if (error.code === 'auth/id-token-revoked') {
-  //       return this.HandleError(
-  //         new UnauthorizedException('Token has been revoked')
-  //       );
-  //     }
-  //     if (error.code === 'auth/argument-error') {
-  //       return this.HandleError(
-  //         new UnauthorizedException('Invalid token format')
-  //       );
-  //     }
-  //     return this.HandleError(
-  //       new UnauthorizedException('Invalid authentication token')
-  //     );
-  //   }
-
-  //   const user = await this.prisma.user.findUnique({
-  //     where: { 
-  //       firebaseId: verifiedUser.uid,
-  //     }
-  //   });
-  //   if (!user) {
-  //     return this.HandleError(
-  //       new UnauthorizedException('User not found')
-  //     );
-  //   }
-
-  //   await this.prisma.user.update({
-  //     where: { id: user.id },
-  //     data: { lastLoggedInAt: new Date() }
-  //   });
-  //   return this.Results(user);
-  // }
-
-  // async forgotPassword(payload: SendOtpDto) {
-  //   const { phone } = payload;
-  //   const firebaseUser = await auth().getUserByPhoneNumber(phone);
-
-  //   const user = await this.prisma.user.findUnique({
-  //     where: { phone }
-  //   });
-
-  //   if (!user) {
-  //     return this.HandleError(
-  //       new NotFoundException('User not found')
-  //     );
-  //   }
-
-  //   return this.Results(user);
-  // }
-
   async resetPassword(payload: ResetPasswordDto) {
     const { newPassword, token } = payload;
 
@@ -417,19 +355,22 @@ export class AuthService extends BaseService {
         new UnauthorizedException('Invalid verification token')
       );
     }
-  
-    // Verify phone-authenticated token
-    if (!verifiedUser.firebase.sign_in_provider || 
-        verifiedUser.firebase.sign_in_provider !== 'phone') {
+
+    const firebaseUser = await auth().getUser(verifiedUser.uid);
+    
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId: verifiedUser.uid }
+    });
+
+    if (!user) {
       return this.HandleError(
-        new UnauthorizedException('Token must be from phone authentication')
+        new UnauthorizedException('User not found')
       );
     }
 
-    const firebaseUser = await auth().getUser(verifiedUser.uid);
-    if (firebaseUser.phoneNumber !== verifiedUser.phone_number) {
+    if (firebaseUser.email && user.email !== firebaseUser.email) {
       return this.HandleError(
-        new UnauthorizedException('Phone number mismatch')
+        new UnauthorizedException('Email mismatch')
       );
     }
    
@@ -439,15 +380,6 @@ export class AuthService extends BaseService {
       });
     } catch (error) {
       return this.HandleError(error);
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { firebaseId: verifiedUser.uid }
-    });
-    if (!user) {
-      return this.HandleError(
-        new UnauthorizedException('User not found')
-      );
     }
 
     await auth().revokeRefreshTokens(verifiedUser.uid);

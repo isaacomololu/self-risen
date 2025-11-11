@@ -609,7 +609,6 @@ export class NotificationsService
       where: { id: userId },
       select: {
         email: true,
-        phone: true,
         fcmTokens: true,
       },
     });
@@ -621,8 +620,8 @@ export class NotificationsService
     switch (channel) {
       case NotificationChannelTypeEnum.EMAIL:
         return user.email;
-      case NotificationChannelTypeEnum.SMS:
-        return user.phone;
+      // case NotificationChannelTypeEnum.SMS:
+      //   return user.phone;
       case NotificationChannelTypeEnum.PUSH:
         // Return first FCM token, or null if none
         return user.fcmTokens.length > 0 ? user.fcmTokens[0] : null;
