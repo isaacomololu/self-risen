@@ -16,9 +16,9 @@ export class UserService extends BaseService {
     return this.Results(users);
   }
 
-  async getUserProfile(id: string) {
+  async getUserProfile(firebaseId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id }
+      where: { firebaseId }
     });
 
     if (!user) {

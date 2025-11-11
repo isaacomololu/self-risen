@@ -8,7 +8,7 @@ import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 import { ChangeNameDto } from './dto';
 
 @UseGuards(FirebaseGuard)
-// @ApiBearerAuth('jwt')
+@ApiBearerAuth('firebase')
 @Controller('user') 
 export class UserController extends BaseController {
   constructor(private readonly userService: UserService) {
@@ -29,16 +29,14 @@ export class UserController extends BaseController {
 
   @Get('one')
   async getUserProfile(@FirebaseUser() user: auth.DecodedIdToken) {
-    console.log('controller user', user);
-    return this.userService.getUserProfile(user.uid);
+    const userProfile = await this.userService.getUserProfile(user.uid);
 
+    if (userProfile.isError) throw userProfile.error;
 
-    // if (user.isError) throw user.error;
-
-    // return this.response({
-    //   message: 'Account Retrived',
-    //   data: user.data,
-    // })
+    return this.response({
+      message: 'Account Retrived',
+      data: userProfile.data,
+    })
   }
 
   @Patch(':id')

@@ -4,9 +4,9 @@ import {
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common';
-import { BaseService, logger } from 'src/common';
+import { BaseService, config, logger } from 'src/common';
 import { DatabaseProvider } from 'src/database/database.provider';
-import { SignUp, ResetPasswordDto, SetUserNameDto, SendOtpDto, VerifyOtpDto, LoginDto } from './dto';
+import { SignUp, ResetPasswordDto, SetUserNameDto, LoginDto, RefreshTokenDto } from './dto';
 import { auth } from 'firebase-admin';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
 import { NotificationTypeEnum } from 'src/notifications/enums/notification.enum';
@@ -169,25 +169,154 @@ export class AuthService extends BaseService {
   //   return this.Results({ user });
   // }
 
-  async login(uid: string) {
-    const verifiedUser = await auth().getUser(uid);
+  async login(payload: LoginDto) {
+    const { email, password } = payload;
+    const firebaseWebApiKey = config.FIREBASE_API_KEY;
+    try {
+      const response = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseWebApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            returnSecureToken: true,
+          }),
+        }
+      );
 
-    const user = await this.prisma.user.findUnique({
-      where: { firebaseId: verifiedUser.uid }
-    });
+      const data = await response.json();
 
-    if (!user) {
+      if (!response.ok) {
+        logger.error(`Firebase authentication failed: ${JSON.stringify(data)}`);
+        
+        if (data.error?.message === 'INVALID_PASSWORD' || data.error?.message === 'EMAIL_NOT_FOUND') {
+          return this.HandleError(
+            new UnauthorizedException('Invalid email or password')
+          );
+        }
+        
+        if (data.error?.message === 'USER_DISABLED') {
+          return this.HandleError(
+            new UnauthorizedException('User account has been disabled')
+          );
+        }
+
+        return this.HandleError(
+          new UnauthorizedException(data.error?.message || 'Authentication failed')
+        );
+      }
+
+      // Verify the ID token using Admin SDK
+      let verifiedUser: auth.DecodedIdToken;
+      try {
+        verifiedUser = await auth().verifyIdToken(data.idToken, true);
+      } catch (error) {
+        logger.error(`Failed to verify ID token: ${error.message || error}`);
+        return this.HandleError(
+          new UnauthorizedException('Failed to verify authentication token')
+        );
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { firebaseId: verifiedUser.uid }
+      });
+
+      if (!user) {
+        return this.HandleError(
+          new UnauthorizedException('User profile not found')
+        );
+      }
+
+      // Update last logged in time
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          lastLoggedInAt: new Date() }
+      });
+
+      return this.Results({ 
+        accessToken: data.idToken,
+        refreshToken: data.refreshToken,
+      });
+    } catch (error) {
+      logger.error(`Login2 error: ${error.message || error}`);
       return this.HandleError(
-        new UnauthorizedException('User profile not found')
+        new UnauthorizedException('Authentication failed. Please try again.')
       );
     }
+  }
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoggedInAt: new Date() }
-    });
+  async refreshToken(payload: RefreshTokenDto) {
+    const { refreshToken } = payload;
+    const firebaseWebApiKey = config.FIREBASE_API_KEY;
 
-    return this.Results({ user });
+    try {
+      const response = await fetch(
+        `https://securetoken.googleapis.com/v1/token?key=${firebaseWebApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+          }).toString(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        logger.error(`Firebase token refresh failed: ${JSON.stringify(data)}`);
+        
+        if (data.error === 'TOKEN_EXPIRED' || data.error === 'INVALID_REFRESH_TOKEN') {
+          return this.HandleError(
+            new UnauthorizedException('Refresh token is invalid or expired. Please log in again.')
+          );
+        }
+
+        return this.HandleError(
+          new UnauthorizedException(data.error?.message || 'Token refresh failed')
+        );
+      }
+
+      let verifiedUser: auth.DecodedIdToken;
+      try {
+        verifiedUser = await auth().verifyIdToken(data.id_token, true);
+      } catch (error) {
+        logger.error(`Failed to verify refreshed ID token: ${error.message || error}`);
+        return this.HandleError(
+          new UnauthorizedException('Failed to verify refreshed authentication token')
+        );
+      }
+
+      // Find user in database to ensure they still exist
+      const user = await this.prisma.user.findUnique({
+        where: { firebaseId: verifiedUser.uid }
+      });
+
+      if (!user) {
+        return this.HandleError(
+          new UnauthorizedException('User profile not found')
+        );
+      }
+
+      return this.Results({
+        accessToken: data.id_token,
+        refreshToken: data.refresh_token,
+        expiresIn: data.expires_in,
+      });
+    } catch (error) {
+      logger.error(`RefreshToken error: ${error.message || error}`);
+      return this.HandleError(
+        new UnauthorizedException('Token refresh failed. Please try again.')
+      );
+    }
   }
 
   async logout(firebaseId: string) {

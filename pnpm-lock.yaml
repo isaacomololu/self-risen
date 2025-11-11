@@ -71,6 +71,9 @@ importers:
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
+      firebase:
+        specifier: ^12.5.0
+        version: 12.5.0
       firebase-admin:
         specifier: ^13.5.0
         version: 13.5.0

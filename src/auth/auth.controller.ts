@@ -4,7 +4,8 @@ import {
   SignUp,
   ResetPasswordDto,
   SetUserNameDto,
-  LoginDto
+  LoginDto,
+  RefreshTokenDto
 } from './dto';
 import { BaseController, AuthGuard, FirebaseUser } from 'src/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -31,10 +32,9 @@ export class AuthController extends BaseController {
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Login with Firebase ID token' })
-  @UseGuards(FirebaseGuard)
-  async login(@FirebaseUser() user: auth.DecodedIdToken) {
-    const result = await this.authService.login(user.uid);
+  @ApiOperation({ summary: 'Login with email and password' })
+  async login(@Body() form: LoginDto) {
+    const result = await this.authService.login(form);
     if (result.isError) throw result.error;
 
     return this.response({
@@ -43,7 +43,20 @@ export class AuthController extends BaseController {
     });
   }
 
+  @Post('refresh-token')
+  @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  async refreshToken(@Body() form: RefreshTokenDto) {
+    const result = await this.authService.refreshToken(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Token refreshed successfully',
+      data: result.data,
+    });
+  }
+
   @Patch('set-username')
+  @ApiBearerAuth('firebase')
   @ApiOperation({ summary: 'Set username for user' })
   @UseGuards(FirebaseGuard)
   async setUserName(
@@ -59,6 +72,7 @@ export class AuthController extends BaseController {
   }
 
   @Patch('logout')
+  @ApiBearerAuth('firebase')
   @ApiOperation({ summary: 'Logout user' })
   @UseGuards(FirebaseGuard)
   async logout(@FirebaseUser() user: auth.DecodedIdToken) {

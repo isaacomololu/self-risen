@@ -42,8 +42,8 @@ async function bootstrap() {
     app.enableCors();
 
     const swaggarConfig = new DocumentBuilder()
-      .setTitle('VAST API')
-      .addBearerAuth({ type: 'http' }, 'jwt')
+      .setTitle('SELF-RISEN API')
+      .addBearerAuth({ type: 'http' }, 'firebase')
       .build();
     SwaggerModule.setup(
       '/api/documentation',

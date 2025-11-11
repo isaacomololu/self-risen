@@ -78,6 +78,12 @@ class Config {
     @IsString()
     FIREBASE_CLIENT_EMAIL: string;
 
+    
+    @IsNotEmpty()
+    @IsString()
+    FIREBASE_API_KEY: string;
+
+
     // Optional Firebase fields (have defaults)
     FIREBASE_PRIVATE_KEY_ID?: string;
     FIREBASE_CLIENT_ID?: string;
