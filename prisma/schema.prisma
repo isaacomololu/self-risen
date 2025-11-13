@@ -117,3 +117,17 @@ enum NotificationStatus {
   SENT
   FAILED
 }
+
+model PasswordResetOtp {
+  id         String    @id @default(uuid())
+  email      String
+  otp        String
+  expiresAt  DateTime
+  isUsed     Boolean   @default(false)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([email])
+  @@index([expiresAt])
+}

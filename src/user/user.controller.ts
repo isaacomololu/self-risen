@@ -7,9 +7,9 @@ import { auth } from 'firebase-admin';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 import { ChangeNameDto } from './dto';
 
-@UseGuards(FirebaseGuard)
-@ApiBearerAuth('firebase')
-@Controller('user') 
+// @UseGuards(FirebaseGuard)
+// @ApiBearerAuth('firebase')
+@Controller('user')
 export class UserController extends BaseController {
   constructor(private readonly userService: UserService) {
     super();

@@ -24,20 +24,11 @@ export class EmailService extends BaseService {
                 refreshToken: config.OAUTH_REFRESH_TOKEN
             }
         });
-        // this.transporter = nodemailer.createTransport({
-        //     host: 'smtp.etheral.email',
-        //     port: 587,
-        //     auth: {
-        //         user: 'kaylin.mraz@ethereal.email',
-        //         pass: 'V9817m1958'
-        //     },
-        // });
     }
 
-    async sendPasswordResetEmail(email: string, token: string) {
-        const resetLink = `${config.FRONTEND_URL}/reset-password?token=${token}`;
+    async sendPasswordResetEmail(email: string, resetLink: string) {
         const mailOptions = {
-            from: 'Vast Manager',
+            from: 'Self-Risen',
             to: email,
             subject: 'Password Reset',
             html: `<p>Click the link below to reset your password:</p><a href="${resetLink}">${resetLink}</a>`
@@ -45,75 +36,42 @@ export class EmailService extends BaseService {
 
         await this.transporter.sendMail(mailOptions);
     }
+
+    async sendPasswordResetOtp(email: string, otp: string) {
+        const mailOptions = {
+            from: 'Self-Risen',
+            to: email,
+            subject: 'Password Reset OTP',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #333;">Password Reset Request</h2>
+                    <p>You have requested to reset your password. Use the OTP code below to proceed:</p>
+                    <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0; border-radius: 5px;">
+                        <h1 style="color: #007bff; font-size: 32px; letter-spacing: 5px; margin: 0;">${otp}</h1>
+                    </div>
+                    <p>This OTP will expire in 10 minutes.</p>
+                    <p>If you did not request this password reset, please ignore this email.</p>
+                    <p>Best regards,<br/>The Self-Risen Team</p>
+                </div>
+            `
+        }
+
+        await this.transporter.sendMail(mailOptions);
+    }
+
+    async sendPasswordResetConfirmation(email: string, name: string) {
+        const mailOptions = {
+            from: 'Self-Risen',
+            to: email,
+            subject: 'Password Changed Successfully',
+            html: `
+                <p>Hello ${name},</p>
+                <p>Your password has been successfully changed.</p>
+                <p>If you did not make this change, please contact support immediately.</p>
+                <p>Best regards,<br/>The Self-Risen Team</p>
+            `
+        }
+
+        await this.transporter.sendMail(mailOptions);
+    }
 }
-// constructor(
-//     private prisma: DatabaseProvider,
-//     private jwtService: JwtService
-// ) {
-//     super();
-//     this.nodemailerTransport = createTransport({
-//         service: 'gmail',
-//         auth: {
-//             type: 'OAuth2',
-//             user: config.MAIL_USERNAME,
-//             pass: config.MAIL_PASSWORD,
-//             clientId: config.OAUTH_CLIENTID,
-//             clientSecret: config.OAUTH_CLIENT_SECRET,
-//             refreshToken: config.OAUTH_REFRESH_TOKEN
-//         }
-//         // host: 'smtp.gmail.com',
-//         // port: 465,
-//         // secure: true,
-//         // auth: {
-//         //     user: config.EMAIL_USER,
-//         //     pass: config.EMAIL_PASSWORD
-//         // }
-//     })
-// }
-
-// private sendMail(options: Mail.Options) {
-//     console.log('Email sent out to', options.to);
-//     return this.nodemailerTransport.sendMail(options);
-// }
-
-// public async sendResetPasswordLink(email: string) {
-//     const payload = { email };
-
-//     const token = this.jwtService.sign(payload, {
-//         secret: process.env.JWT_SECRET,
-//         expiresIn: '1h',
-//     });
-
-//     const user = await this.prisma.user.findUnique({
-//         where: { email },
-//     });
-//     if (!user) {
-//         return this.HandleError(
-//             new NotFoundException('User with this email not found')
-//         );
-//     }
-//     // user.resetToken = token;
-
-
-//     const url = `${config.EMAIL_RESET_PASSWORD_URL}?token=${token}`;
-
-//     const text = `Hi, \nTo reset your password, click here: ${url}`;
-
-//     return this.sendMail({
-//         to: email,
-//         subject: 'Reset password',
-//         text
-//     });
-
-// }
-
-// public async decodeConfirmationToken(token: string) {
-//     const payload = await this.jwtService.verify(token, {
-//         secret: config.JWT_VERIFICATION_TOKEN_SECRET
-//     });
-
-//     if (typeof payload === 'object' && 'email' in payload) {
-//         return payload.email;
-//     }
-//     return this.HandleError(new BadRequestException());
-// }

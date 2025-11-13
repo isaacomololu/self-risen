@@ -7,3 +7,4 @@ export { ResetPasswordDto } from './reset-password.dto';
 export { SetUserNameDto } from './set-username.dto';
 export { SendOtpDto } from './send-otp.dto';
 export { VerifyOtpDto } from './verify-otp.dto';
+export { VerifyPasswordResetOtpDto } from './verify-password-reset-otp.dto';

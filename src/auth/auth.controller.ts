@@ -5,7 +5,10 @@ import {
   ResetPasswordDto,
   SetUserNameDto,
   LoginDto,
-  RefreshTokenDto
+  RefreshTokenDto,
+  ForgotPasswordDto,
+  ChangePasswordDto,
+  VerifyPasswordResetOtpDto
 } from './dto';
 import { BaseController, AuthGuard, FirebaseUser } from 'src/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -60,7 +63,7 @@ export class AuthController extends BaseController {
   @ApiOperation({ summary: 'Set username for user' })
   @UseGuards(FirebaseGuard)
   async setUserName(
-    @FirebaseUser() user: auth.DecodedIdToken, 
+    @FirebaseUser() user: auth.DecodedIdToken,
     @Body() form: SetUserNameDto
   ) {
     const result = await this.authService.setUserName(user.uid, form);
@@ -84,12 +87,53 @@ export class AuthController extends BaseController {
     });
   }
 
-  @Put('reset-password')
-  @ApiOperation({ summary: 'Reset password using OTP verification token' })
-  async resetPasswordWithOtp(@Body() form: ResetPasswordDto) {
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset OTP via email' })
+  async forgotPassword(@Body() form: ForgotPasswordDto) {
+    const result = await this.authService.forgotPassword(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'If an account with that email exists, a password reset OTP has been sent.',
+      data: result.data,
+    });
+  }
+
+  @Post('verify-password-reset-otp')
+  @ApiOperation({ summary: 'Verify password reset OTP code' })
+  async verifyPasswordResetOtp(@Body() form: VerifyPasswordResetOtpDto) {
+    const result = await this.authService.verifyPasswordResetOtp(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'OTP verified successfully',
+      data: result.data,
+    });
+  }
+
+  @Patch('change-password')
+  @ApiBearerAuth('firebase')
+  @ApiOperation({ summary: 'Change password for authenticated user' })
+  @UseGuards(FirebaseGuard)
+  async changePassword(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @Body() form: ChangePasswordDto
+  ) {
+    const result = await this.authService.changePassword(user.uid, form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Password changed successfully',
+      data: result.data,
+    });
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password after OTP has been verified' })
+  async resetPassword(@Body() form: ResetPasswordDto) {
     const result = await this.authService.resetPassword(form);
     if (result.isError) throw result.error;
-    
+
     return this.response({
       message: 'Password reset successfully',
       data: result.data,
