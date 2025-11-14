@@ -7,8 +7,8 @@ import { auth } from 'firebase-admin';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 import { ChangeNameDto } from './dto';
 
-// @UseGuards(FirebaseGuard)
-// @ApiBearerAuth('firebase')
+@UseGuards(FirebaseGuard)
+@ApiBearerAuth('firebase')
 @Controller('user')
 export class UserController extends BaseController {
   constructor(private readonly userService: UserService) {
@@ -28,8 +28,8 @@ export class UserController extends BaseController {
   }
 
   @Get('one')
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth('firebase')
+  // @UseGuards(AuthGuard)
+  // @ApiBearerAuth('firebase')
   async getUserProfile(@FirebaseUser() user: auth.DecodedIdToken) {
     const userProfile = await this.userService.getUserProfile(user.uid);
 
