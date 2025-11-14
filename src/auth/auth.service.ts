@@ -362,30 +362,28 @@ export class AuthService extends BaseService {
       ]);
 
       // Send OTP via email
-      try {
-        await this.emailService.sendPasswordResetOtp(email, otp);
-        logger.log(`Password reset OTP sent to email: ${email}`);
-      } catch (emailError) {
-        logger.error(`Failed to send password reset OTP email: ${emailError.message || emailError}`);
-        // Mark the OTP as used since user can't receive it
-        await this.prisma.passwordResetOtp.updateMany({
-          where: {
-            email,
-            otp: hashedOtp,
-            isUsed: false
-          },
-          data: {
-            isUsed: true
-          }
-        });
-        return this.HandleError(
-          new ConflictException('Failed to send password reset email. Please try again later.')
-        );
-      }
+      // try {
+      //   await this.emailService.sendPasswordResetOtp(email, otp);
+      //   logger.log(`Password reset OTP sent to email: ${email}`);
+      // } catch (emailError) {
+      //   logger.error(`Failed to send password reset OTP email: ${emailError.message || emailError}`);
+      //   // Mark the OTP as used since user can't receive it
+      //   await this.prisma.passwordResetOtp.updateMany({
+      //     where: {
+      //       email,
+      //       otp: hashedOtp,
+      //       isUsed: false
+      //     },
+      //     data: {
+      //       isUsed: true
+      //     }
+      //   });
+      //   return this.HandleError(
+      //     new ConflictException('Failed to send password reset email. Please try again later.')
+      //   );
+      // }
 
-      return this.Results({
-        message: 'If an account with that email exists, a password reset OTP has been sent.'
-      });
+      return this.Results(otp);
     } catch (error) {
       logger.error(`Forgot password error: ${error.message || error}`);
       // Return generic message even on error for security

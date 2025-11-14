@@ -28,6 +28,8 @@ export class UserController extends BaseController {
   }
 
   @Get('one')
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth('firebase')
   async getUserProfile(@FirebaseUser() user: auth.DecodedIdToken) {
     const userProfile = await this.userService.getUserProfile(user.uid);
 
