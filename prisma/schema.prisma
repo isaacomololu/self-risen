@@ -14,18 +14,19 @@ datasource db {
 }
 
 model User {
-  id              String    @id @default(uuid(4))
-  firebaseId      String    @unique
+  id              String       @id @default(uuid(4))
+  firebaseId      String       @unique
   name            String
   username        String?
   // password        String
-  email           String    @unique
+  email           String       @unique
   avatar          String?
-  fcmTokens       String[]  @default([])
+  fcmTokens       String[]     @default([])
   lastLoggedInAt  DateTime?
   lastLoggedOutAt DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  wheelOfLife     WheelOfLife?
 }
 
 model Notification {
@@ -130,4 +131,45 @@ model PasswordResetOtp {
 
   @@index([email])
   @@index([expiresAt])
+}
+
+model WheelOfLife {
+  id          String            @id @default(uuid())
+  userId      String            @unique
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories  WheelCategory[]
+  assessments WheelAssessment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId])
+}
+
+model WheelCategory {
+  id        String      @id @default(uuid())
+  wheelId   String
+  wheel     WheelOfLife @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([wheelId])
+}
+
+model WheelAssessment {
+  id              String      @id @default(uuid())
+  wheelId         String
+  wheel           WheelOfLife @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  scores          Json
+  strongestArea   String?
+  weakestArea     String?
+  imbalanceScore  Float?
+  focusCategoryId String?
+  completedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([wheelId])
+  @@index([wheelId, createdAt])
 }

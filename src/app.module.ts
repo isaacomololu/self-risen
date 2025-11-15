@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { EmailModule } from './common/email/email.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WheelOfLifeModule } from './wheel-of-life/wheel-of-life.module';
 import { FirebaseAdminModule } from '@alpha018/nestjs-firebase-auth';
 import { ExtractJwt } from 'passport-jwt';
 import * as admin from 'firebase-admin';
@@ -46,17 +47,17 @@ import * as path from 'path';
         console.log('Project ID:', projectId ? `✓ Set (${projectId})` : '✗ Missing');
         console.log('Client Email:', clientEmail ? `✓ Set (${clientEmail})` : '✗ Missing');
         console.log('Private Key:', privateKey ? `✓ Set (${privateKey.length} chars)` : '✗ Missing');
-        
+
         // Fallback to JSON file if env vars are missing
         if (!projectId || !privateKey || !clientEmail) {
           console.log('Environment variables missing, trying to load from firebase-credentials.json...');
           const credentialsPath = path.join(process.cwd(), 'firebase-credentials.json');
-          
+
           if (fs.existsSync(credentialsPath)) {
             try {
               const fileContent = fs.readFileSync(credentialsPath, 'utf-8');
               const fileCredentials = JSON.parse(fileContent);
-              
+
               const credentials = {
                 projectId: fileCredentials.project_id,
                 privateKey: fileCredentials.private_key.replace(/\\n/g, '\n'),
@@ -64,9 +65,9 @@ import * as path from 'path';
                 ...(fileCredentials.private_key_id && { privateKeyId: fileCredentials.private_key_id }),
                 ...(fileCredentials.client_id && { clientId: fileCredentials.client_id }),
               };
-              
+
               console.log('✓ Loaded credentials from firebase-credentials.json');
-              
+
               return {
                 credential: admin.credential.cert(credentials),
                 options: {
@@ -84,7 +85,7 @@ import * as path from 'path';
               console.error('Failed to load from JSON file:', error.message);
             }
           }
-          
+
           throw new Error(
             `Missing required Firebase credentials. ProjectId: ${!!projectId}, PrivateKey: ${!!privateKey}, ClientEmail: ${!!clientEmail}`
           );
@@ -97,16 +98,16 @@ import * as path from 'path';
 
         // Process private key - handle both \n and actual newlines
         let processedPrivateKey = privateKey.trim();
-        
+
         // Remove surrounding quotes if present
         if ((processedPrivateKey.startsWith('"') && processedPrivateKey.endsWith('"')) ||
-            (processedPrivateKey.startsWith("'") && processedPrivateKey.endsWith("'"))) {
+          (processedPrivateKey.startsWith("'") && processedPrivateKey.endsWith("'"))) {
           processedPrivateKey = processedPrivateKey.slice(1, -1);
         }
-        
+
         // Replace literal \n with actual newlines
         processedPrivateKey = processedPrivateKey.replace(/\\n/g, '\n');
-        
+
         // Ensure proper formatting - should have newlines between markers and key content
         if (!processedPrivateKey.includes('\n')) {
           // If no newlines found, try to add them (this shouldn't happen but just in case)
@@ -128,11 +129,11 @@ import * as path from 'path';
         console.log('Private key has newlines:', credentials.privateKey.includes('\n'));
         console.log('Private key starts with:', credentials.privateKey.substring(0, 50));
         console.log('Private key ends with:', credentials.privateKey.substring(credentials.privateKey.length - 50));
-        
+
         try {
           const certCredential = admin.credential.cert(credentials);
           console.log('✓ Firebase credential object created successfully');
-          
+
           // Verify the credential can actually get an access token
           // This will fail if credentials are invalid
           console.log('Testing credential by getting access token...');
@@ -144,7 +145,7 @@ import * as path from 'path';
               console.error('✗ Credential verification failed:', err.message);
               console.error('This means the credentials are invalid or the service account lacks permissions');
             });
-          
+
           // The module expects 'options' to be passed directly to initializeApp
           // We need to structure it correctly
           return {
@@ -172,6 +173,7 @@ import * as path from 'path';
     DatabaseModule,
     EmailModule,
     NotificationsModule,
+    WheelOfLifeModule,
     // JwtModule.registerAsync({
     //   useFactory: () => ({
     //     secret: config.JWT_SECRET,
@@ -183,4 +185,4 @@ import * as path from 'path';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
