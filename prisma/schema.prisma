@@ -139,6 +139,7 @@ model WheelOfLife {
   user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   categories  WheelCategory[]
   assessments WheelAssessment[]
+  focuses     WheelFocus[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -146,30 +147,49 @@ model WheelOfLife {
 }
 
 model WheelCategory {
-  id        String      @id @default(uuid())
+  id        String       @id @default(uuid())
   wheelId   String
-  wheel     WheelOfLife @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  wheel     WheelOfLife  @relation(fields: [wheelId], references: [id], onDelete: Cascade)
   name      String
   order     Int
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  focuses   WheelFocus[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@index([wheelId])
 }
 
 model WheelAssessment {
-  id              String      @id @default(uuid())
-  wheelId         String
-  wheel           WheelOfLife @relation(fields: [wheelId], references: [id], onDelete: Cascade)
-  scores          Json
-  strongestArea   String?
-  weakestArea     String?
-  imbalanceScore  Float?
-  focusCategoryId String?
-  completedAt     DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String       @id @default(uuid())
+  wheelId        String
+  wheel          WheelOfLife  @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  scores         Json
+  strongestArea  String?
+  weakestArea    String?
+  imbalanceScore Float?
+  focuses        WheelFocus[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([wheelId])
   @@index([wheelId, createdAt])
+}
+
+model WheelFocus {
+  id                String           @id @default(uuid())
+  wheelId           String
+  wheel             WheelOfLife      @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  categoryId        String
+  category          WheelCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  isActive          Boolean          @default(true)
+  startedAt         DateTime         @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  wheelAssessment   WheelAssessment? @relation(fields: [wheelAssessmentId], references: [id])
+  wheelAssessmentId String?
+
+  @@index([wheelId])
+  @@index([categoryId])
+  @@index([wheelId, isActive])
 }

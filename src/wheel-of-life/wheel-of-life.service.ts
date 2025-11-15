@@ -7,6 +7,9 @@ import {
     UpdateScoresDto,
     ChooseFocusDto,
     AssessmentBreakdown,
+    UpdateFocusDto,
+    FocusResponse,
+    FocusListResponse,
 } from './dto';
 
 @Injectable()
@@ -27,39 +30,35 @@ export class WheelOfLifeService extends BaseService {
     }
 
     async getOrCreateWheel(firebaseId: string) {
-        try {
-            const user = await this.prisma.user.findUnique({
-                where: { firebaseId },
-                include: { wheelOfLife: { include: { categories: { orderBy: { order: 'asc' } } } } },
-            });
+        const user = await this.prisma.user.findUnique({
+            where: { firebaseId },
+            include: { wheelOfLife: { include: { categories: { orderBy: { order: 'asc' } } } } },
+        });
 
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
-
-            // If wheel exists, return it
-            if (user.wheelOfLife) {
-                return this.Results(user.wheelOfLife);
-            }
-
-            // Create wheel with default categories
-            const wheel = await this.prisma.wheelOfLife.create({
-                data: {
-                    userId: user.id,
-                    categories: {
-                        create: this.DEFAULT_CATEGORIES.map((name, index) => ({
-                            name,
-                            order: index,
-                        })),
-                    },
-                },
-                include: { categories: { orderBy: { order: 'asc' } } },
-            });
-
-            return this.Results(wheel);
-        } catch (error) {
-            return this.HandleError(error as Error);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        // If wheel exists, return it
+        if (user.wheelOfLife) {
+            return this.Results(user.wheelOfLife);
+        }
+
+        // Create wheel with default categories
+        const wheel = await this.prisma.wheelOfLife.create({
+            data: {
+                userId: user.id,
+                categories: {
+                    create: this.DEFAULT_CATEGORIES.map((name, index) => ({
+                        name,
+                        order: index,
+                    })),
+                },
+            },
+            include: { categories: { orderBy: { order: 'asc' } } },
+        });
+
+        return this.Results(wheel);
     }
 
     async updateCategory(
@@ -67,282 +66,367 @@ export class WheelOfLifeService extends BaseService {
         categoryId: string,
         payload: UpdateCategoryDto,
     ) {
-        try {
-            const user = await this.getUserByFirebaseId(firebaseId);
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
-
-            const category = await this.prisma.wheelCategory.findFirst({
-                where: {
-                    id: categoryId,
-                    wheel: { userId: user.id },
-                },
-            });
-
-            if (!category) {
-                return this.HandleError(new NotFoundException('Category not found'));
-            }
-
-            const updated = await this.prisma.wheelCategory.update({
-                where: { id: categoryId },
-                data: payload,
-            });
-
-            return this.Results(updated);
-        } catch (error) {
-            return this.HandleError(error as Error);
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        const category = await this.prisma.wheelCategory.findFirst({
+            where: {
+                id: categoryId,
+                wheel: { userId: user.id },
+            },
+        });
+
+        if (!category) {
+            return this.HandleError(new NotFoundException('Category not found'));
+        }
+
+        const updated = await this.prisma.wheelCategory.update({
+            where: { id: categoryId },
+            data: payload,
+        });
+
+        return this.Results(updated);
     }
 
     async addCategory(firebaseId: string, payload: AddCategoryDto) {
-        try {
-            const user = await this.getUserByFirebaseId(firebaseId);
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
-
-            const wheel = await this.getWheelByUserId(user.id);
-            if (!wheel) {
-                return this.HandleError(new NotFoundException('Wheel not found'));
-            }
-
-            // Get max order to append at end
-            const maxOrderCategory = await this.prisma.wheelCategory.findFirst({
-                where: { wheelId: wheel.id },
-                orderBy: { order: 'desc' },
-                select: { order: true },
-            });
-
-            const category = await this.prisma.wheelCategory.create({
-                data: {
-                    wheelId: wheel.id,
-                    name: payload.name,
-                    order: payload.order ?? (maxOrderCategory?.order ?? -1) + 1,
-                },
-            });
-
-            return this.Results(category);
-        } catch (error) {
-            return this.HandleError(error as Error);
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
+
+        // Get max order to append at end
+        const maxOrderCategory = await this.prisma.wheelCategory.findFirst({
+            where: { wheelId: wheel.id },
+            orderBy: { order: 'desc' },
+            select: { order: true },
+        });
+
+        const category = await this.prisma.wheelCategory.create({
+            data: {
+                wheelId: wheel.id,
+                name: payload.name,
+                order: payload.order ?? (maxOrderCategory?.order ?? -1) + 1,
+            },
+        });
+
+        return this.Results(category);
     }
 
     async deleteCategory(firebaseId: string, categoryId: string) {
-        try {
-            const user = await this.getUserByFirebaseId(firebaseId);
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
-
-            const category = await this.prisma.wheelCategory.findFirst({
-                where: {
-                    id: categoryId,
-                    wheel: { userId: user.id },
-                },
-            });
-
-            if (!category) {
-                return this.HandleError(new NotFoundException('Category not found'));
-            }
-
-            await this.prisma.wheelCategory.delete({
-                where: { id: categoryId },
-            });
-
-            return this.Results(null);
-        } catch (error) {
-            return this.HandleError(error as Error);
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        const category = await this.prisma.wheelCategory.findFirst({
+            where: {
+                id: categoryId,
+                wheel: { userId: user.id },
+            },
+        });
+
+        if (!category) {
+            return this.HandleError(new NotFoundException('Category not found'));
+        }
+
+        await this.prisma.wheelCategory.delete({
+            where: { id: categoryId },
+        });
+
+        return this.Results(null);
     }
 
     async updateScores(firebaseId: string, payload: UpdateScoresDto) {
-        try {
-            const user = await this.getUserByFirebaseId(firebaseId);
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
-
-            const wheel = await this.getWheelByUserId(user.id);
-            if (!wheel) {
-                return this.HandleError(new NotFoundException('Wheel not found'));
-            }
-
-            // Validate all category IDs exist and scores are 1-10
-            const categories = await this.prisma.wheelCategory.findMany({
-                where: { wheelId: wheel.id },
-            });
-
-            for (const [categoryId, score] of Object.entries(payload.scores)) {
-                if (!categories.find((c) => c.id === categoryId)) {
-                    return this.HandleError(
-                        new BadRequestException(`Category ${categoryId} not found`),
-                    );
-                }
-                if (score < 1 || score > 10) {
-                    return this.HandleError(
-                        new BadRequestException('Scores must be between 1 and 10'),
-                    );
-                }
-            }
-
-            // Calculate breakdown
-            const breakdown = this.calculateBreakdown(
-                categories,
-                payload.scores,
-            );
-
-            // Create or update latest assessment
-            const latestAssessment = await this.prisma.wheelAssessment.findFirst({
-                where: { wheelId: wheel.id },
-                orderBy: { createdAt: 'desc' },
-            });
-
-            const assessment = latestAssessment
-                ? await this.prisma.wheelAssessment.update({
-                    where: { id: latestAssessment.id },
-                    data: {
-                        scores: payload.scores,
-                        strongestArea: breakdown.strongestArea.categoryId,
-                        weakestArea: breakdown.weakestArea.categoryId,
-                        imbalanceScore: breakdown.imbalanceScore,
-                    },
-                })
-                : await this.prisma.wheelAssessment.create({
-                    data: {
-                        wheelId: wheel.id,
-                        scores: payload.scores,
-                        strongestArea: breakdown.strongestArea.categoryId,
-                        weakestArea: breakdown.weakestArea.categoryId,
-                        imbalanceScore: breakdown.imbalanceScore,
-                    },
-                });
-
-            return this.Results({
-                assessment,
-                breakdown,
-            });
-        } catch (error) {
-            return this.HandleError(error as Error);
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
+
+        // Validate all category IDs exist and scores are 1-10
+        const categories = await this.prisma.wheelCategory.findMany({
+            where: { wheelId: wheel.id },
+        });
+
+        for (const [categoryId, score] of Object.entries(payload.scores)) {
+            if (!categories.find((c) => c.id === categoryId)) {
+                return this.HandleError(
+                    new BadRequestException(`Category ${categoryId} not found`),
+                );
+            }
+            if (score < 1 || score > 10) {
+                return this.HandleError(
+                    new BadRequestException('Scores must be between 1 and 10'),
+                );
+            }
+        }
+
+        // Calculate breakdown
+        const breakdown = this.calculateBreakdown(
+            categories,
+            payload.scores,
+        );
+
+        // Create or update latest assessment
+        const latestAssessment = await this.prisma.wheelAssessment.findFirst({
+            where: { wheelId: wheel.id },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const assessment = latestAssessment
+            ? await this.prisma.wheelAssessment.update({
+                where: { id: latestAssessment.id },
+                data: {
+                    scores: payload.scores,
+                    strongestArea: breakdown.strongestArea.categoryId,
+                    weakestArea: breakdown.weakestArea.categoryId,
+                    imbalanceScore: breakdown.imbalanceScore,
+                },
+            })
+            : await this.prisma.wheelAssessment.create({
+                data: {
+                    wheelId: wheel.id,
+                    scores: payload.scores,
+                    strongestArea: breakdown.strongestArea.categoryId,
+                    weakestArea: breakdown.weakestArea.categoryId,
+                    imbalanceScore: breakdown.imbalanceScore,
+                },
+            });
+
+        return this.Results({
+            assessment,
+            breakdown,
+        });
+
     }
 
     async getAssessmentBreakdown(firebaseId: string) {
-        try {
-            const user = await this.getUserByFirebaseId(firebaseId);
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
-
-            const wheel = await this.getWheelByUserId(user.id);
-            if (!wheel) {
-                return this.HandleError(new NotFoundException('Wheel not found'));
-            }
-
-            const assessment = await this.prisma.wheelAssessment.findFirst({
-                where: { wheelId: wheel.id },
-                orderBy: { createdAt: 'desc' },
-                include: { wheel: { include: { categories: true } } },
-            });
-
-            if (!assessment) {
-                return this.HandleError(
-                    new NotFoundException('No assessment found. Please complete your scores first.'),
-                );
-            }
-
-            const categories = assessment.wheel.categories;
-            const scores = assessment.scores as Record<string, number>;
-            const breakdown = this.calculateBreakdown(categories, scores);
-
-            return this.Results(breakdown);
-        } catch (error) {
-            return this.HandleError(error as Error);
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
+
+        const assessment = await this.prisma.wheelAssessment.findFirst({
+            where: { wheelId: wheel.id },
+            orderBy: { createdAt: 'desc' },
+            include: { wheel: { include: { categories: true } } },
+        });
+
+        if (!assessment) {
+            return this.HandleError(
+                new NotFoundException('No assessment found. Please complete your scores first.'),
+            );
+        }
+
+        const categories = assessment.wheel.categories;
+        const scores = assessment.scores as Record<string, number>;
+        const breakdown = this.calculateBreakdown(categories, scores);
+
+        return this.Results(breakdown);
     }
 
     async chooseFocus(firebaseId: string, payload: ChooseFocusDto) {
-        try {
-            const user = await this.getUserByFirebaseId(firebaseId);
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
-
-            const wheel = await this.getWheelByUserId(user.id);
-            if (!wheel) {
-                return this.HandleError(new NotFoundException('Wheel not found'));
-            }
-
-            // Validate category belongs to user's wheel
-            const category = await this.prisma.wheelCategory.findFirst({
-                where: {
-                    id: payload.categoryId,
-                    wheelId: wheel.id,
-                },
-            });
-
-            if (!category) {
-                return this.HandleError(new NotFoundException('Category not found'));
-            }
-
-            // Update latest assessment
-            const assessment = await this.prisma.wheelAssessment.findFirst({
-                where: { wheelId: wheel.id },
-                orderBy: { createdAt: 'desc' },
-            });
-
-            if (!assessment) {
-                return this.HandleError(
-                    new NotFoundException('No assessment found. Please complete your scores first.'),
-                );
-            }
-
-            const updated = await this.prisma.wheelAssessment.update({
-                where: { id: assessment.id },
-                data: {
-                    focusCategoryId: payload.categoryId,
-                    completedAt: new Date(),
-                },
-            });
-
-            return this.Results({
-                assessment: updated,
-                focusCategory: category,
-            });
-        } catch (error) {
-            return this.HandleError(error as Error);
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
+
+        // Validate category belongs to user's wheel
+        const category = await this.prisma.wheelCategory.findFirst({
+            where: {
+                id: payload.categoryId,
+                wheelId: wheel.id,
+            },
+        });
+
+        if (!category) {
+            return this.HandleError(new NotFoundException('Category not found'));
+        }
+
+        const existingFocus = await this.prisma.wheelFocus.findFirst({
+            where: {
+                categoryId: payload.categoryId,
+                wheelId: wheel.id,
+            },
+        });
+
+        if (existingFocus) {
+            return this.HandleError(new BadRequestException('Focus already exists'));
+        }
+
+
+        // Create new focus record
+        const focus = await this.prisma.wheelFocus.create({
+            data: {
+                wheelId: wheel.id,
+                categoryId: payload.categoryId,
+                isActive: true,
+            },
+            include: {
+                category: true,
+                wheelAssessment: true,
+            },
+        });
+
+        return this.Results({
+            focus: this.mapFocusToResponse(focus),
+        });
     }
 
-
     async getAssessmentHistory(firebaseId: string) {
-        try {
-            const user = await this.getUserByFirebaseId(firebaseId);
-            if (!user) {
-                return this.HandleError(new NotFoundException('User not found'));
-            }
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
 
-            const wheel = await this.getWheelByUserId(user.id);
-            if (!wheel) {
-                return this.HandleError(new NotFoundException('Wheel not found'));
-            }
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
 
-            const assessments = await this.prisma.wheelAssessment.findMany({
-                where: { wheelId: wheel.id },
-                orderBy: { createdAt: 'desc' },
-                include: {
-                    wheel: {
-                        include: {
-                            categories: true,
+        const assessments = await this.prisma.wheelAssessment.findMany({
+            where: { wheelId: wheel.id },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                wheel: {
+                    include: {
+                        categories: {
+                            include: {
+                                focuses: true,
+                            },
                         },
                     },
                 },
-            });
+            },
+        });
 
-            return this.Results(assessments);
-        } catch (error) {
-            return this.HandleError(error as Error);
+        return this.Results(assessments);
+    }
+
+    async getFocuses(firebaseId: string, activeOnly?: boolean) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
+
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
+
+        const where: any = { wheelId: wheel.id };
+        if (activeOnly !== undefined) {
+            where.isActive = activeOnly;
+        }
+
+        const focuses = await this.prisma.wheelFocus.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            include: {
+                category: true,
+                wheelAssessment: true,
+            },
+        });
+
+        // const focusResponses = focuses.map((focus) => this.mapFocusToResponse(focus));
+        const activeCount = focuses.filter((f) => f.isActive).length;
+        const completedCount = focuses.filter((f) => f.completedAt).length;
+
+        return this.Results({
+            focuses,
+            activeCount,
+            completedCount,
+        });
+    }
+
+    async completeFocus(firebaseId: string, focusId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
+
+        // Validate focus belongs to user's wheel
+        const focus = await this.prisma.wheelFocus.findFirst({
+            where: {
+                id: focusId,
+                wheelId: wheel.id,
+            },
+        });
+
+        if (!focus) {
+            return this.HandleError(new NotFoundException('Focus not found'));
+        }
+
+        const completedAt = new Date();
+        const updated = await this.prisma.wheelFocus.update({
+            where: { id: focusId },
+            data: {
+                isActive: false,
+                completedAt: completedAt ? new Date(completedAt) : null
+            },
+            include: {
+                category: true,
+                wheelAssessment: true,
+            },
+        });
+
+        return this.Results(updated);
+    }
+
+    async deleteFocus(firebaseId: string, focusId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const wheel = await this.getWheelByUserId(user.id);
+        if (!wheel) {
+            return this.HandleError(new NotFoundException('Wheel not found'));
+        }
+
+        // Validate focus belongs to user's wheel
+        const focus = await this.prisma.wheelFocus.findFirst({
+            where: {
+                id: focusId,
+                wheelId: wheel.id,
+            },
+        });
+
+        if (!focus) {
+            return this.HandleError(new NotFoundException('Focus not found'));
+        }
+
+        await this.prisma.wheelFocus.delete({
+            where: { id: focusId },
+        });
+
+        return this.Results(null);
     }
 
     // Helper methods
@@ -360,8 +444,23 @@ export class WheelOfLifeService extends BaseService {
     }
 
     /**
-     * Calculate breakdown metrics
+     * Map Prisma focus to response format
      */
+    private mapFocusToResponse(focus: any): FocusResponse {
+        return {
+            id: focus.id,
+            wheelId: focus.wheelId,
+            categoryId: focus.categoryId,
+            categoryName: focus.category.name,
+            assessmentId: focus.assessmentId || undefined,
+            isActive: focus.isActive,
+            startedAt: focus.startedAt,
+            completedAt: focus.completedAt || undefined,
+            createdAt: focus.createdAt,
+            updatedAt: focus.updatedAt,
+        };
+    }
+
     private calculateBreakdown(
         categories: Array<{ id: string; name: string }>,
         scores: Record<string, number>,

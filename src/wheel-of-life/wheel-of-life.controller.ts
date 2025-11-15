@@ -6,6 +6,7 @@ import {
     Delete,
     Body,
     Param,
+    Query,
     UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -19,6 +20,7 @@ import {
     AddCategoryDto,
     UpdateScoresDto,
     ChooseFocusDto,
+    UpdateFocusDto,
 } from './dto';
 
 @UseGuards(FirebaseGuard)
@@ -121,7 +123,50 @@ export class WheelOfLifeController extends BaseController {
         if (result.isError) throw result.error;
 
         return this.response({
-            message: 'Focus category selected',
+            message: 'Focus created',
+            data: result.data,
+        });
+    }
+
+    @Get('focuses')
+    async getFocuses(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Query('activeOnly') activeOnly?: string,
+    ) {
+        const activeOnlyBool = activeOnly === 'true' ? true : activeOnly === 'false' ? false : undefined;
+        const result = await this.wheelService.getFocuses(user.uid, activeOnlyBool);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Focuses retrieved',
+            data: result.data,
+        });
+    }
+
+    @Patch('focuses/:focusId')
+    async completeFocus(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('focusId') focusId: string,
+    ) {
+        const result = await this.wheelService.completeFocus(user.uid, focusId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Focus updated',
+            data: result.data,
+        });
+    }
+
+    @Delete('focuses/:focusId')
+    async deleteFocus(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('focusId') focusId: string,
+    ) {
+        const result = await this.wheelService.deleteFocus(user.uid, focusId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Focus deleted',
             data: result.data,
         });
     }
