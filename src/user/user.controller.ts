@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { BaseController } from 'src/common';
 import { AuthGuard, FirebaseUser } from 'src/common/';
@@ -51,6 +64,57 @@ export class UserController extends BaseController {
       message: 'Names Updated',
       data: user.data,
     })
+  }
+
+  @Post('avatar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 2 * 1024 * 1024, // 2MB max file size
+      },
+      fileFilter: (_req, file, callback) => {
+        const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (allowedMimeTypes.includes(file.mimetype)) {
+          callback(null, true);
+        } else {
+          callback(
+            new BadRequestException(
+              'Invalid file type. Only JPG, JPEG, PNG, and GIF are allowed.'
+            ),
+            false
+          );
+        }
+      },
+    })
+  )
+  async uploadAvatar(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const result = await this.userService.uploadAvatar(user.uid, file);
+
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Avatar uploaded successfully',
+      data: result.data,
+    });
+  }
+
+  @Delete('avatar')
+  async deleteAvatar(@FirebaseUser() user: auth.DecodedIdToken) {
+    const result = await this.userService.deleteAvatar(user.uid);
+
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Avatar deleted successfully',
+      data: result.data,
+    });
   }
 
   @Delete(':id')

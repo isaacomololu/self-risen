@@ -101,6 +101,19 @@ class Config {
     TWILIO_ACCOUNT_SID?: string;
     TWILIO_AUTH_TOKEN?: string;
     TWILIO_PHONE_NUMBER?: string;
+
+    // Google Cloud Storage Configuration
+    @IsNotEmpty()
+    @IsString()
+    GOOGLE_CLOUD_PROJECT_ID: string;
+
+    @IsNotEmpty()
+    @IsString()
+    GOOGLE_CLOUD_STORAGE_BUCKET: string;
+
+    @IsNotEmpty()
+    @IsString()
+    GOOGLE_CLOUD_CREDENTIALS: string; // JSON string containing service account credentials
 }
 
 export let config: Config;
