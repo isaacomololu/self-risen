@@ -31,6 +31,7 @@ async function bootstrap() {
         admin.initializeApp({
           credential: admin.credential.cert(credentials),
           projectId: config.FIREBASE_PROJECT_ID,
+          storageBucket: config.FIREBASE_STORAGE_BUCKET,
         });
         console.log('✓ Firebase Admin SDK initialized successfully with credentials');
       } else {

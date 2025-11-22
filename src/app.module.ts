@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
@@ -8,18 +8,20 @@ import { DatabaseModule } from './database/database.module';
 import { EmailModule } from './common/email/email.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WheelOfLifeModule } from './wheel-of-life/wheel-of-life.module';
+import { StorageModule } from './common/storage/storage.module';
+import { ReflectionModule } from './reflection/reflection.module';
 import { FirebaseAdminModule } from '@alpha018/nestjs-firebase-auth';
 import { ExtractJwt } from 'passport-jwt';
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
+import { config } from './common';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     FirebaseAdminModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
+      useFactory: () => {
         // If Firebase is already initialized in main.ts, don't pass options
         // The module's buggy code will use getApp() which will get our initialized app
         if (admin.apps.length > 0) {
@@ -36,11 +38,11 @@ import * as path from 'path';
           };
         }
 
-        const projectId = configService.get<string>('FIREBASE_PROJECT_ID');
-        const privateKey = configService.get<string>('FIREBASE_PRIVATE_KEY');
-        const clientEmail = configService.get<string>('FIREBASE_CLIENT_EMAIL');
-        const privateKeyId = configService.get<string>('FIREBASE_PRIVATE_KEY_ID');
-        const clientId = configService.get<string>('FIREBASE_CLIENT_ID');
+        const projectId = config.FIREBASE_PROJECT_ID;
+        const privateKey = config.FIREBASE_PRIVATE_KEY;
+        const clientEmail = config.FIREBASE_CLIENT_EMAIL;
+        const privateKeyId = config.FIREBASE_PRIVATE_KEY_ID;
+        const clientId = config.FIREBASE_CLIENT_ID;
 
         // Debug logging
         console.log('=== Firebase Configuration Debug ===');
@@ -68,10 +70,12 @@ import * as path from 'path';
 
               console.log('✓ Loaded credentials from firebase-credentials.json');
 
+              const storageBucket = config.FIREBASE_STORAGE_BUCKET;
               return {
                 credential: admin.credential.cert(credentials),
                 options: {
                   projectId: credentials.projectId,
+                  ...(storageBucket && { storageBucket }),
                 },
                 auth: {
                   config: {
@@ -148,10 +152,12 @@ import * as path from 'path';
 
           // The module expects 'options' to be passed directly to initializeApp
           // We need to structure it correctly
+          const storageBucket = config.FIREBASE_STORAGE_BUCKET;
           return {
             options: {
               credential: certCredential,
               projectId,
+              ...(storageBucket && { storageBucket }),
             },
             auth: {
               config: {
@@ -166,7 +172,6 @@ import * as path from 'path';
           throw new Error(`Invalid Firebase credentials: ${error.message}`);
         }
       },
-      inject: [ConfigService],
     }),
     AuthModule,
     UserModule,
@@ -174,6 +179,8 @@ import * as path from 'path';
     EmailModule,
     NotificationsModule,
     WheelOfLifeModule,
+    StorageModule,
+    ReflectionModule,
     // JwtModule.registerAsync({
     //   useFactory: () => ({
     //     secret: config.JWT_SECRET,

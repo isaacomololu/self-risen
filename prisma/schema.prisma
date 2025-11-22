@@ -14,19 +14,20 @@ datasource db {
 }
 
 model User {
-  id              String       @id @default(uuid(4))
-  firebaseId      String       @unique
-  name            String
-  username        String?
+  id                 String              @id @default(uuid(4))
+  firebaseId         String              @unique
+  name               String
+  username           String?
   // password        String
-  email           String       @unique
-  avatar          String?
-  fcmTokens       String[]     @default([])
-  lastLoggedInAt  DateTime?
-  lastLoggedOutAt DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  wheelOfLife     WheelOfLife?
+  email              String              @unique
+  avatar             String?
+  fcmTokens          String[]            @default([])
+  lastLoggedInAt     DateTime?
+  lastLoggedOutAt    DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  wheelOfLife        WheelOfLife?
+  reflectionSessions ReflectionSession[]
 }
 
 model Notification {
@@ -147,14 +148,15 @@ model WheelOfLife {
 }
 
 model WheelCategory {
-  id        String       @id @default(uuid())
-  wheelId   String
-  wheel     WheelOfLife  @relation(fields: [wheelId], references: [id], onDelete: Cascade)
-  name      String
-  order     Int
-  focuses   WheelFocus[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id                 String              @id @default(uuid())
+  wheelId            String
+  wheel              WheelOfLife         @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  name               String
+  order              Int
+  focuses            WheelFocus[]
+  reflectionSessions ReflectionSession[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@index([wheelId])
 }
@@ -176,20 +178,65 @@ model WheelAssessment {
 }
 
 model WheelFocus {
-  id                String           @id @default(uuid())
-  wheelId           String
-  wheel             WheelOfLife      @relation(fields: [wheelId], references: [id], onDelete: Cascade)
-  categoryId        String
-  category          WheelCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  isActive          Boolean          @default(true)
-  startedAt         DateTime         @default(now())
-  completedAt       DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  wheelAssessment   WheelAssessment? @relation(fields: [wheelAssessmentId], references: [id])
-  wheelAssessmentId String?
+  id                 String              @id @default(uuid())
+  wheelId            String
+  wheel              WheelOfLife         @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  categoryId         String
+  category           WheelCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  isActive           Boolean             @default(true)
+  startedAt          DateTime            @default(now())
+  completedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  wheelAssessment    WheelAssessment?    @relation(fields: [wheelAssessmentId], references: [id])
+  wheelAssessmentId  String?
+  reflectionSessions ReflectionSession[]
 
   @@index([wheelId])
   @@index([categoryId])
   @@index([wheelId, isActive])
+}
+
+model ReflectionSession {
+  id                      String                  @id @default(uuid())
+  userId                  String
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId              String
+  category                WheelCategory           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  wheelFocusId            String?
+  wheelFocus              WheelFocus?             @relation(fields: [wheelFocusId], references: [id], onDelete: SetNull)
+  prompt                  String
+  rawBeliefText           String?
+  audioUrl                String?
+  transcriptionText       String?
+  limitingBelief          String?
+  generatedAffirmation    String?
+  approvedAffirmation     String?
+  sessionDurationDays     Int?
+  expiresAt               DateTime?
+  aiAffirmationAudioUrl   String?
+  userAffirmationAudioUrl String?
+  playbackCount           Int                     @default(0)
+  lastPlayedAt            DateTime?
+  beliefRerecordedAt      DateTime?
+  beliefRerecordCount     Int                     @default(0)
+  status                  ReflectionSessionStatus @default(PENDING)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  completedAt             DateTime?
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([wheelFocusId])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([expiresAt, status])
+}
+
+enum ReflectionSessionStatus {
+  PENDING
+  BELIEF_CAPTURED
+  AFFIRMATION_GENERATED
+  APPROVED
+  COMPLETED
 }

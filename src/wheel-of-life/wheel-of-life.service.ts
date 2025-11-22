@@ -32,9 +32,22 @@ export class WheelOfLifeService extends BaseService {
     async getOrCreateWheel(firebaseId: string) {
         const user = await this.prisma.user.findUnique({
             where: { firebaseId },
-            include: { wheelOfLife: { include: { categories: { orderBy: { order: 'asc' } } } } },
+            include: {
+                wheelOfLife: {
+                    include: {
+                        categories: {
+                            include: {
+                                focuses: {
+                                    include: {
+                                        wheelAssessment: true,
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         });
-
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));
         }

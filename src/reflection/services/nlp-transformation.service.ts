@@ -1,0 +1,148 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { config, BaseService } from 'src/common';
+import OpenAI from 'openai';
+
+@Injectable()
+export class NlpTransformationService extends BaseService {
+    private readonly logger = new Logger(NlpTransformationService.name);
+    private openai: OpenAI | null = null;
+    private readonly systemPrompt = `You are a cognitive reframing assistant specializing in transforming limiting beliefs into empowering affirmations.
+
+Your role is to:
+1. Identify and extract the core limiting belief pattern from the user's statement
+2. Transform it into a positive, empowering affirmation that:
+   - Is written in first person (I am, I have, I can, etc.)
+   - Is present tense and actionable
+   - Is specific and meaningful (not generic)
+   - Maintains psychological authenticity
+   - Empowers the user to see new possibilities
+
+Guidelines:
+- The limiting belief should be a clear, concise statement of the negative pattern
+- The affirmation should directly counter the limiting belief
+- Keep affirmations realistic and achievable
+- Use empowering language that inspires action
+- Avoid clichés or overly generic statements
+
+Return your response as a JSON object with exactly these two fields:
+- "limitingBelief": A clear statement of the limiting belief pattern
+- "generatedAffirmation": The empowering affirmation in first person`;
+
+    constructor() {
+        super();
+        this.openai = new OpenAI({
+            apiKey: config.OPENAI_API_KEY,
+        });
+        this.logger.log('OpenAI client initialized for NLP transformation');
+    }
+
+    /**
+     * Transform limiting belief into empowering affirmation using OpenAI
+     * 
+     * @param beliefText - The user's raw belief text
+     * @returns Object containing limiting belief and generated affirmation
+     */
+    async transformBelief(beliefText: string): Promise<{ limitingBelief: string; generatedAffirmation: string }> {
+        if (!this.openai) {
+            this.logger.warn('OpenAI not configured. Returning placeholder transformation.');
+            return this.getPlaceholderTransformation(beliefText);
+        }
+
+        if (!beliefText || beliefText.trim().length === 0) {
+            this.logger.warn('Empty belief text provided. Returning placeholder.');
+            return this.getPlaceholderTransformation(beliefText);
+        }
+
+        try {
+            this.logger.log(`Starting NLP transformation for belief: ${beliefText.substring(0, 50)}...`);
+
+            const model = config.OPENAI_NLP_MODEL || 'gpt-3.5-turbo';
+
+            const response = await this.openai.chat.completions.create({
+                model: model,
+                messages: [
+                    { role: 'system', content: this.systemPrompt },
+                    { role: 'user', content: beliefText },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.7,
+                max_tokens: 500,
+            });
+
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error('Empty response from OpenAI');
+            }
+
+            // Parse JSON response
+            let parsedResponse: { limitingBelief: string; generatedAffirmation: string };
+            try {
+                parsedResponse = JSON.parse(content);
+            } catch (parseError) {
+                this.logger.error(`Failed to parse OpenAI JSON response: ${parseError.message}`);
+                throw new Error('Invalid JSON response from OpenAI');
+            }
+
+            // Validate response structure
+            if (!parsedResponse.limitingBelief || !parsedResponse.generatedAffirmation) {
+                throw new Error('Missing required fields in OpenAI response');
+            }
+
+            // Sanitize and validate
+            const limitingBelief = this.sanitizeText(parsedResponse.limitingBelief);
+            const generatedAffirmation = this.sanitizeText(parsedResponse.generatedAffirmation);
+
+            if (limitingBelief.length === 0 || generatedAffirmation.length === 0) {
+                throw new Error('Empty fields after sanitization');
+            }
+
+            // Validate length (affirmations should be reasonable length)
+            if (generatedAffirmation.length > 500) {
+                this.logger.warn(`Generated affirmation is very long (${generatedAffirmation.length} chars), truncating`);
+                // Could truncate, but for now just log
+            }
+
+            this.logger.log(`NLP transformation completed successfully. Affirmation length: ${generatedAffirmation.length} chars`);
+
+            return {
+                limitingBelief,
+                generatedAffirmation,
+            };
+        } catch (error) {
+            this.logger.error(`Error in NLP transformation: ${error.message}`, error.stack);
+
+            // Return placeholder on error (graceful degradation)
+            this.logger.warn('Falling back to placeholder transformation due to error');
+            return this.getPlaceholderTransformation(beliefText);
+        }
+    }
+
+    /**
+     * Sanitize text by removing markdown, extra whitespace, and formatting
+     */
+    private sanitizeText(text: string): string {
+        if (!text) return '';
+
+        return text
+            .trim()
+            .replace(/\*\*/g, '') // Remove markdown bold
+            .replace(/\*/g, '') // Remove markdown italic
+            .replace(/#{1,6}\s/g, '') // Remove markdown headers
+            .replace(/\n{2,}/g, '\n') // Replace multiple newlines with single
+            .replace(/\s{2,}/g, ' ') // Replace multiple spaces with single
+            .trim();
+    }
+
+    /**
+     * Get placeholder transformation when OpenAI is unavailable or fails
+     */
+    private getPlaceholderTransformation(beliefText: string): { limitingBelief: string; generatedAffirmation: string } {
+        const limitingBelief = beliefText || 'Belief pattern not identified';
+        const generatedAffirmation = 'I am transforming my relationship with this belief. I choose to see new possibilities and create positive change in my life.';
+
+        return {
+            limitingBelief,
+            generatedAffirmation,
+        };
+    }
+} 

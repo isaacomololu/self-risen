@@ -7,5 +7,7 @@ export * from './config';
 export * from './guards';
 export { BaseService } from './base.service';
 export { BaseController } from './base.controller';
+export { StorageService, FileType, UploadResult } from './storage/storage.service';
+export { StorageModule } from './storage/storage.module';
 
 export const logger = new Logger(displayName);

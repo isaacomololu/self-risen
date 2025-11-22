@@ -78,7 +78,7 @@ class Config {
     @IsString()
     FIREBASE_CLIENT_EMAIL: string;
 
-    
+
     @IsNotEmpty()
     @IsString()
     FIREBASE_API_KEY: string;
@@ -87,6 +87,23 @@ class Config {
     // Optional Firebase fields (have defaults)
     FIREBASE_PRIVATE_KEY_ID?: string;
     FIREBASE_CLIENT_ID?: string;
+
+    @IsNotEmpty()
+    @IsString()
+    FIREBASE_STORAGE_BUCKET: string;
+
+    // Supabase Configuration (optional, required only when using Supabase)
+    @IsString()
+    SUPABASE_URL?: string;
+
+    @IsString()
+    SUPABASE_SERVICE_ROLE_KEY?: string;
+
+    @IsString()
+    SUPABASE_STORAGE_BUCKET?: string;
+
+    // Storage Provider Selection (optional, defaults to 'firebase')
+    STORAGE_PROVIDER?: string;
 
     // Redis Configuration
     REDIS_HOST?: string;
@@ -101,6 +118,22 @@ class Config {
     TWILIO_ACCOUNT_SID?: string;
     TWILIO_AUTH_TOKEN?: string;
     TWILIO_PHONE_NUMBER?: string;
+
+    // OpenAI Configuration
+    @IsString()
+    OPENAI_API_KEY?: string;
+
+    @IsString()
+    OPENAI_MODEL?: string;
+
+    @IsString()
+    OPENAI_NLP_MODEL?: string;
+
+    @IsString()
+    OPENAI_TTS_MODEL?: string;
+
+    @IsString()
+    OPENAI_TTS_VOICE?: string;
 }
 
 export let config: Config;
