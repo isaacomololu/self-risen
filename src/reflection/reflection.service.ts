@@ -633,6 +633,42 @@ export class ReflectionService extends BaseService {
         return this.Results(sessionWithAudio);
     }
 
+    async getAffirmations(firebaseId: string, page: number = 1, limit: number = 10) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const pageNumber = Math.max(1, Math.floor(page));
+        const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
+        const skip = (pageNumber - 1) * pageSize;
+
+        const totalCount = await this.prisma.reflectionSession.count({
+            where: { userId: user.id },
+        });
+
+        const affirmations = await this.prisma.reflectionSession.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: pageSize,
+        });
+
+        const totalPages = Math.ceil(totalCount / pageSize);
+
+        return this.Results({
+            data: affirmations,
+            pagination: {
+                page: pageNumber,
+                limit: pageSize,
+                total: totalCount,
+                totalPages,
+                hasNextPage: pageNumber < totalPages,
+                hasPreviousPage: pageNumber > 1,
+            },
+        });
+    }
+
     /**
      * Get the appropriate audio URL for affirmation playback
      * Priority: userAffirmationAudioUrl > aiAffirmationAudioUrl

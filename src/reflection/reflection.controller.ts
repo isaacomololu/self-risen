@@ -4,6 +4,7 @@ import {
     Post,
     Body,
     Param,
+    Query,
     UseGuards,
     UseInterceptors,
     UploadedFile,
@@ -15,6 +16,7 @@ import {
     ApiResponse,
     ApiBody,
     ApiParam,
+    ApiQuery,
     ApiConsumes,
     ApiTags,
 } from '@nestjs/swagger';
@@ -379,6 +381,70 @@ export class ReflectionController extends BaseController {
 
         return this.response({
             message: 'Playback tracked successfully',
+            data: result.data,
+        });
+    }
+
+    @Get('affirmations')
+    @ApiOperation({
+        summary: 'Get paginated affirmations',
+        description: 'Retrieves paginated list of reflection sessions (affirmations) for the current user. Results are ordered by creation date (most recent first).',
+    })
+    @ApiQuery({
+        name: 'page',
+        required: false,
+        type: Number,
+        description: 'Page number (default: 1)',
+        example: 1,
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        type: Number,
+        description: 'Number of items per page (default: 10, max: 100)',
+        example: 10,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmations retrieved successfully',
+        schema: {
+            example: {
+                message: 'Affirmations retrieved',
+                data: {
+                    data: [],
+                    pagination: {
+                        page: 1,
+                        limit: 10,
+                        total: 0,
+                        totalPages: 0,
+                        hasNextPage: false,
+                        hasPreviousPage: false,
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User not found',
+    })
+    async getAffirmations(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+    ) {
+        const pageNumber = page ? parseInt(page, 10) : 1;
+        const limitNumber = limit ? parseInt(limit, 10) : 10;
+
+        const result = await this.reflectionService.getAffirmations(
+            user.uid,
+            pageNumber,
+            limitNumber,
+        );
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Affirmations retrieved',
             data: result.data,
         });
     }
