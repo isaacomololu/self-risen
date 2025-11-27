@@ -15,7 +15,7 @@ import {
   FilesInterceptor,
   FileFieldsInterceptor,
 } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 import { FirebaseUser } from 'src/common';
 import { auth } from 'firebase-admin';
@@ -27,12 +27,31 @@ import { UploadFileResponseDto, UploadFilesResponseDto } from './dto';
 @ApiBearerAuth('firebase')
 @Controller('storage')
 export class StorageController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(private readonly storageService: StorageService) { }
 
   @Post('upload/image')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a single image file' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image file to upload (JPEG, PNG, GIF, WebP, SVG)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiQuery({
+    name: 'folder',
+    required: false,
+    type: String,
+    description: 'Optional folder path to organize the uploaded file',
+  })
   async uploadImage(
     @FirebaseUser() user: auth.DecodedIdToken,
     @UploadedFile() file: Express.Multer.File,
@@ -59,6 +78,28 @@ export class StorageController {
   @UseInterceptors(FilesInterceptor('files', 10)) // Max 10 files
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload multiple image files' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Image files to upload (max 10 files, JPEG, PNG, GIF, WebP, SVG)',
+        },
+      },
+      required: ['files'],
+    },
+  })
+  @ApiQuery({
+    name: 'folder',
+    required: false,
+    type: String,
+    description: 'Optional folder path to organize the uploaded files',
+  })
   async uploadImages(
     @FirebaseUser() user: auth.DecodedIdToken,
     @UploadedFiles() files: Express.Multer.File[],
@@ -85,6 +126,25 @@ export class StorageController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a single audio file' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Audio file to upload (MP3, WAV, OGG, AAC, WebM, M4A)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiQuery({
+    name: 'folder',
+    required: false,
+    type: String,
+    description: 'Optional folder path to organize the uploaded file',
+  })
   async uploadAudio(
     @FirebaseUser() user: auth.DecodedIdToken,
     @UploadedFile() file: Express.Multer.File,
@@ -111,6 +171,25 @@ export class StorageController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a single video file' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Video file to upload (MP4, MPEG, QuickTime, AVI, WebM, OGG)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiQuery({
+    name: 'folder',
+    required: false,
+    type: String,
+    description: 'Optional folder path to organize the uploaded file',
+  })
   async uploadVideo(
     @FirebaseUser() user: auth.DecodedIdToken,
     @UploadedFile() file: Express.Multer.File,
@@ -143,6 +222,43 @@ export class StorageController {
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload mixed file types' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        images: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Image files to upload (max 10 files)',
+        },
+        audios: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Audio files to upload (max 10 files)',
+        },
+        videos: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Video files to upload (max 10 files)',
+        },
+      },
+    },
+  })
+  @ApiQuery({
+    name: 'folder',
+    required: false,
+    type: String,
+    description: 'Optional folder path to organize the uploaded files',
+  })
   async uploadMixed(
     @FirebaseUser() user: auth.DecodedIdToken,
     @UploadedFiles()

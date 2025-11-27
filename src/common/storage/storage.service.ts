@@ -29,7 +29,6 @@ export class StorageService {
   private readonly bucket?: any;
   private readonly supabaseService?: SupabaseStorageService;
 
-  // Allowed MIME types for each file type
   private readonly ALLOWED_IMAGE_TYPES = [
     'image/jpeg',
     'image/jpg',
@@ -47,6 +46,8 @@ export class StorageService {
     'audio/aac',
     'audio/webm',
     'audio/m4a',
+    'audio/x-m4a',
+    'audio/mp4',
   ];
 
   private readonly ALLOWED_VIDEO_TYPES = [
@@ -109,10 +110,36 @@ export class StorageService {
           : this.MAX_VIDEO_SIZE;
 
     // Check MIME type
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException(
-        `Invalid file type. Allowed types for ${fileType}: ${allowedTypes.join(', ')}`,
-      );
+    const fileExtension = file.originalname?.split('.').pop()?.toLowerCase();
+    const mimetype = file.mimetype || '';
+
+    if (!mimetype || !allowedTypes.includes(mimetype)) {
+      // Fallback: check file extension for common cases (especially for iOS/React Native)
+      const extensionToMimeMap: Record<string, string[]> = {
+        'm4a': ['audio/m4a', 'audio/x-m4a', 'audio/mp4'],
+        'mp3': ['audio/mpeg', 'audio/mp3'],
+        'wav': ['audio/wav'],
+        'ogg': ['audio/ogg'],
+        'aac': ['audio/aac'],
+        'webm': ['audio/webm'],
+      };
+
+      // If mimetype doesn't match but extension suggests it's a valid audio file, allow it
+      if (fileType === FileType.AUDIO && fileExtension && extensionToMimeMap[fileExtension]) {
+        const expectedMimes = extensionToMimeMap[fileExtension];
+        if (expectedMimes.some(mime => allowedTypes.includes(mime))) {
+          // File extension matches an allowed type, proceed with validation
+          // The mimetype will be accepted even if it's one of the alternative forms
+        } else {
+          throw new BadRequestException(
+            `Invalid file type. Received mimetype: "${mimetype}", file extension: "${fileExtension}". Allowed types for ${fileType}: ${allowedTypes.join(', ')}`,
+          );
+        }
+      } else {
+        throw new BadRequestException(
+          `Invalid file type. Received mimetype: "${mimetype}", file extension: "${fileExtension}". Allowed types for ${fileType}: ${allowedTypes.join(', ')}`,
+        );
+      }
     }
 
     // Check file size

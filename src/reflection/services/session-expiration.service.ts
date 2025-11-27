@@ -16,6 +16,7 @@ export class SessionExpirationService extends BaseService {
      */
     @Cron('*/1 * * * *') // Every minute
     async checkAndCompleteExpiredSessions() {
+        this.logger.log('Checking and completing expired sessions');
         try {
             const now = new Date();
 
