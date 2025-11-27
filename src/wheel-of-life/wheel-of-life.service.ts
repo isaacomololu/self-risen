@@ -281,6 +281,7 @@ export class WheelOfLifeService extends BaseService {
             where: {
                 categoryId: payload.categoryId,
                 wheelId: wheel.id,
+                isActive: true,
             },
         });
 

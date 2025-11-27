@@ -46,6 +46,7 @@ export class StorageService {
     'audio/ogg',
     'audio/aac',
     'audio/webm',
+    'audio/m4a',
   ];
 
   private readonly ALLOWED_VIDEO_TYPES = [
