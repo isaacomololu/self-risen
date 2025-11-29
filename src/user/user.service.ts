@@ -151,4 +151,22 @@ export class UserService extends BaseService {
     }
   }
 
+  async getStats(firebaseId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId },
+      select: {
+        streak: true,
+        sessions: true,
+      }
+    });
+
+    if (!user) {
+      return this.HandleError(
+        new NotFoundException('User not found')
+      )
+    };
+
+    return this.Results(user);
+  }
+
 }

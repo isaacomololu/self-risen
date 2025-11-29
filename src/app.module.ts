@@ -16,10 +16,14 @@ import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
 import { config } from './common';
+import { StreakInterceptor } from './common/interceptors/streak.interceptor';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    CommonModule,
     FirebaseAdminModule.forRootAsync({
       useFactory: () => {
         // If Firebase is already initialized in main.ts, don't pass options
@@ -190,6 +194,12 @@ import { config } from './common';
     // }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: StreakInterceptor,
+    }
+  ],
 })
 export class AppModule { }

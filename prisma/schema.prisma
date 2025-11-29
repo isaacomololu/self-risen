@@ -22,6 +22,9 @@ model User {
   email              String              @unique
   avatar             String?
   fcmTokens          String[]            @default([])
+  streak             Int                 @default(0)
+  sessions           Int                 @default(0)
+  lastStreakDate     DateTime?
   lastLoggedInAt     DateTime?
   lastLoggedOutAt    DateTime?
   createdAt          DateTime            @default(now())

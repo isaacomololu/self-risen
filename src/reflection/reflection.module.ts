@@ -8,9 +8,15 @@ import { TranscriptionService } from './services/transcription.service';
 import { NlpTransformationService } from './services/nlp-transformation.service';
 import { TextToSpeechService } from './services/text-to-speech.service';
 import { SessionExpirationService } from './services/session-expiration.service';
+import { CommonModule } from 'src/common/common.module';
 
 @Module({
-    imports: [DatabaseModule, StorageModule, ScheduleModule.forRoot()],
+    imports: [
+        CommonModule,
+        DatabaseModule,
+        StorageModule,
+        ScheduleModule.forRoot()
+    ],
     controllers: [ReflectionController],
     providers: [
         ReflectionService,

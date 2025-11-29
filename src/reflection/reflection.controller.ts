@@ -22,13 +22,14 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
-import { FirebaseUser } from 'src/common';
+import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { ReflectionService } from './reflection.service';
 import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto } from './dto';
 
 @UseGuards(FirebaseGuard)
+@UseInterceptors(StreakInterceptor)
 @ApiBearerAuth('firebase')
 @ApiTags('Reflection')
 @Controller('reflection')

@@ -233,4 +233,16 @@ export class UserController extends BaseController {
       data: user.data,
     })
   }
+
+  @Get('stats')
+  async getStats(@FirebaseUser() user: auth.DecodedIdToken) {
+    const stats = await this.userService.getStats(user.uid);
+
+    if (stats.isError) throw stats.error;
+
+    return this.response({
+      message: 'Stats Retrived',
+      data: stats.data,
+    })
+  }
 }

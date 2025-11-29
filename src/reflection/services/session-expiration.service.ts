@@ -56,6 +56,10 @@ export class SessionExpirationService extends BaseService {
                 },
             });
 
+            await Promise.all(expiredSessions.map(async (session) => {
+                await this.updateUserSessions(session.userId);
+            }));
+
             this.logger.log(`Completed ${result.count} expired session(s)`);
         } catch (error) {
             this.logger.error(
@@ -64,4 +68,14 @@ export class SessionExpirationService extends BaseService {
             );
         }
     }
+
+    private async updateUserSessions(userId: string) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                sessions: { increment: 1 },
+            },
+        });
+    }
 }
+
