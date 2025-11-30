@@ -8,10 +8,7 @@ import { DatabaseProvider } from 'src/database/database.provider';
 import {
   RegisterFcmTokenDto,
   RemoveFcmTokenDto,
-  SendNotificationDto,
-  SendBulkNotificationDto,
 } from './dto';
-import { messaging } from 'firebase-admin';
 import {
   INotificationService,
   UserNotificationRequest,
@@ -21,7 +18,7 @@ import {
   NotificationChannel,
   BulkNotificationResult,
 } from './interfaces/notification.interface';
-import { NotificationQueueProducer } from './services/dispatcher.service';
+import { NotificationQueueService } from './services/notification-queue.service';
 import { TemplateService } from './services/template.service';
 import {
   NotificationChannelTypeEnum,
@@ -32,11 +29,10 @@ import {
 @Injectable()
 export class NotificationsService
   extends BaseService
-  implements INotificationService
-{
+  implements INotificationService {
   constructor(
     private prisma: DatabaseProvider,
-    private dispatcher: NotificationQueueProducer,
+    private dispatcher: NotificationQueueService,
     private templateService: TemplateService,
   ) {
     super();

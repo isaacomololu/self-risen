@@ -85,11 +85,11 @@ export class ReflectionController extends BaseController {
         status: 404,
         description: 'Reflection session not found',
     })
-    async getSession(
+    async getSessionById(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('sessionId') sessionId: string,
     ) {
-        const result = await this.reflectionService.getSession(user.uid, sessionId);
+        const result = await this.reflectionService.getSessionById(user.uid, sessionId);
         if (result.isError) throw result.error;
 
         return this.response({

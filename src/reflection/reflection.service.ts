@@ -51,13 +51,11 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        // Validate category belongs to user's wheel
         const category = await this.validateCategoryOwnership(user.id, dto.categoryId);
         if (!category) {
             return this.HandleError(new NotFoundException('Category not found or does not belong to user'));
         }
 
-        // Validate wheelFocusId if provided
         if (dto.wheelFocusId) {
             const wheelFocus = await this.prisma.wheelFocus.findFirst({
                 where: {
@@ -72,10 +70,8 @@ export class ReflectionService extends BaseService {
             }
         }
 
-        // Generate prompt based on category name
         const prompt = this.generatePrompt(category.name);
 
-        // Calculate expiration date
         const sessionDurationDays = dto.sessionDurationDays || 7; // Default to 7 days
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + sessionDurationDays);
@@ -110,10 +106,7 @@ export class ReflectionService extends BaseService {
         return this.Results(sessionWithAudio);
     }
 
-    /**
-     * Get a reflection session by ID
-     */
-    async getSession(firebaseId: string, sessionId: string) {
+    async getSessionById(firebaseId: string, sessionId: string) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));

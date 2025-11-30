@@ -5,10 +5,8 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 import { DatabaseProvider } from 'src/database/database.provider';
-import { NotificationQueueProducer } from './services/dispatcher.service';
-import { NotificationProcessor } from './services/notification-processor';
+import { NotificationQueueService } from './services/notification-queue.service';
 import { TemplateService } from './services/template.service';
-import { ConfigValidatorService } from './services/config-validator.service';
 import { AuditLogRepository } from './repositories/audit-log.repository';
 import { DeadLetterQueueRepository } from './repositories/dead-letter-queue.repository';
 import { MailgunAdapter } from './adapters/email/mailgun.adapter';
@@ -52,10 +50,8 @@ import { NotificationChannelTypeEnum } from './enums/notification.enum';
       useClass: NotificationsService,
     },
     NotificationsService,
-    NotificationQueueProducer,
-    NotificationProcessor,
+    NotificationQueueService,
     TemplateService,
-    ConfigValidatorService,
     AuditLogRepository,
     DeadLetterQueueRepository,
     DatabaseProvider,
@@ -84,4 +80,4 @@ import { NotificationChannelTypeEnum } from './enums/notification.enum';
   ],
   exports: [INotificationService, NotificationsService],
 })
-export class NotificationsModule {}
+export class NotificationsModule { }
