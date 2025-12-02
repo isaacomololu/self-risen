@@ -42,9 +42,6 @@ export class ReflectionService extends BaseService {
         super();
     }
 
-    /**
-     * Create a new reflection session
-     */
     async createSession(firebaseId: string, dto: CreateSessionDto) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
@@ -140,18 +137,62 @@ export class ReflectionService extends BaseService {
         return this.Results(sessionWithAudio);
     }
 
-    async getAllSessions(firebaseId: string) {
+    async getAllSessions(
+        firebaseId: string,
+        page: number = 1,
+        limit: number = 10,
+    ) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        const sessions = await this.prisma.reflectionSession.findMany({
-            where: { userId: user.id },
+        const pageNumber = Math.max(1, Math.floor(page));
+        const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
+        const skip = (pageNumber - 1) * pageSize;
+
+        const whereClause = { userId: user.id };
+
+        const totalCount = await this.prisma.reflectionSession.count({
+            where: whereClause,
         });
 
-        return this.Results(sessions);
+        const sessions = await this.prisma.reflectionSession.findMany({
+            where: whereClause,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: pageSize,
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        // Add computed affirmationAudioUrl field to each session
+        const sessionsWithAudio = sessions.map((session) => ({
+            ...session,
+            affirmationAudioUrl: this.getAffirmationAudioUrl(session),
+        }));
+
+        const totalPages = Math.ceil(totalCount / pageSize);
+
+        return this.Results({
+            data: sessionsWithAudio,
+            pagination: {
+                page: pageNumber,
+                limit: pageSize,
+                total: totalCount,
+                totalPages,
+                hasNextPage: pageNumber < totalPages,
+                hasPreviousPage: pageNumber > 1,
+            },
+        });
     }
+
     /**
      * Submit belief (text or audio) for a reflection session
      */
@@ -624,42 +665,6 @@ export class ReflectionService extends BaseService {
         };
 
         return this.Results(sessionWithAudio);
-    }
-
-    async getAffirmations(firebaseId: string, page: number = 1, limit: number = 10) {
-        const user = await this.getUserByFirebaseId(firebaseId);
-        if (!user) {
-            return this.HandleError(new NotFoundException('User not found'));
-        }
-
-        const pageNumber = Math.max(1, Math.floor(page));
-        const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
-        const skip = (pageNumber - 1) * pageSize;
-
-        const totalCount = await this.prisma.reflectionSession.count({
-            where: { userId: user.id },
-        });
-
-        const affirmations = await this.prisma.reflectionSession.findMany({
-            where: { userId: user.id },
-            orderBy: { createdAt: 'desc' },
-            skip,
-            take: pageSize,
-        });
-
-        const totalPages = Math.ceil(totalCount / pageSize);
-
-        return this.Results({
-            data: affirmations,
-            pagination: {
-                page: pageNumber,
-                limit: pageSize,
-                total: totalCount,
-                totalPages,
-                hasNextPage: pageNumber < totalPages,
-                hasPreviousPage: pageNumber > 1,
-            },
-        });
     }
 
     /**

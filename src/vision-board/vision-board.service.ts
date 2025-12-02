@@ -1,0 +1,464 @@
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { DatabaseProvider } from 'src/database/database.provider';
+import { BaseService } from 'src/common';
+import { StorageService, FileType } from 'src/common/storage/storage.service';
+import { AddVisionDto } from './dto';
+import { ReflectionSessionStatus } from '@prisma/client';
+
+@Injectable()
+export class VisionBoardService extends BaseService {
+    private readonly logger = new Logger(VisionBoardService.name);
+
+    constructor(
+        private prisma: DatabaseProvider,
+        private storageService: StorageService,
+    ) {
+        super();
+    }
+
+    private async getOrCreateVisionBoard(userId: string) {
+        let visionBoard = await this.prisma.visionBoard.findUnique({
+            where: { userId },
+        });
+
+        if (!visionBoard) {
+            visionBoard = await this.prisma.visionBoard.create({
+                data: { userId },
+            });
+        }
+
+        return visionBoard;
+    }
+
+    async addVision(
+        firebaseId: string,
+        reflectionSessionId: string,
+        imageFile?: Express.Multer.File,
+    ) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const reflectionSession = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: reflectionSessionId,
+                userId: user.id,
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        if (!reflectionSession) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        if (reflectionSession.status !== ReflectionSessionStatus.AFFIRMATION_GENERATED) {
+            return this.HandleError(
+                new BadRequestException('Reflection session must be in APPROVED status to add to vision board'),
+            );
+        }
+
+        // Check if already added to vision board
+        const existingItem = await this.prisma.visionBoardItem.findUnique({
+            where: { reflectionSessionId },
+        });
+
+        if (existingItem) {
+            return this.HandleError(
+                new BadRequestException('This reflection session is already in the vision board'),
+            );
+        }
+
+        // Get or create vision board
+        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+
+        let imageUrl: string | undefined;
+        if (imageFile) {
+            try {
+                const uploadResult = await this.storageService.uploadFile(
+                    imageFile,
+                    FileType.IMAGE,
+                    user.id,
+                    'vision-board/images',
+                );
+                imageUrl = uploadResult.url;
+            } catch (error) {
+                return this.HandleError(
+                    new BadRequestException(`Failed to upload image: ${error.message}`),
+                );
+            }
+        }
+
+        const maxOrderItem = await this.prisma.visionBoardItem.findFirst({
+            where: { visionBoardId: visionBoard.id },
+            orderBy: { order: 'desc' },
+        });
+
+        const order = maxOrderItem ? (maxOrderItem.order || 0) + 1 : 1;
+
+        // Create vision board item
+        const createData: any = {
+            visionBoardId: visionBoard.id,
+            reflectionSessionId: reflectionSession.id,
+            order,
+        };
+        if (imageUrl) {
+            createData.imageUrl = imageUrl;
+        }
+
+        const visionItem = await this.prisma.visionBoardItem.create({
+            data: createData,
+            include: {
+                reflectionSession: {
+                    include: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        // Format response
+        const response = {
+            id: visionItem.id,
+            visionBoardId: visionItem.visionBoardId,
+            reflectionSessionId: visionItem.reflectionSessionId,
+            imageUrl: visionItem.imageUrl,
+            order: visionItem.order,
+            createdAt: visionItem.createdAt,
+            updatedAt: visionItem.updatedAt,
+            affirmation: reflectionSession.approvedAffirmation || reflectionSession.generatedAffirmation,
+            reflectionSession: {
+                id: reflectionSession.id,
+                prompt: reflectionSession.prompt,
+                category: reflectionSession.category,
+            },
+        };
+
+        return this.Results(response);
+    }
+
+    /**
+     * Get all visions for user's vision board (paginated)
+     */
+    async getAllVisions(firebaseId: string, page: number = 1, limit: number = 10) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const pageNumber = Math.max(1, Math.floor(page));
+        const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
+        const skip = (pageNumber - 1) * pageSize;
+
+        // Get or create vision board
+        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+
+        const totalCount = await this.prisma.visionBoardItem.count({
+            where: { visionBoardId: visionBoard.id },
+        });
+
+        const items = await this.prisma.visionBoardItem.findMany({
+            where: { visionBoardId: visionBoard.id },
+            orderBy: { order: 'asc' },
+            skip,
+            take: pageSize,
+            include: {
+                reflectionSession: {
+                    include: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const totalPages = Math.ceil(totalCount / pageSize);
+
+        // Format response
+        const data = items.map((item) => ({
+            id: item.id,
+            visionBoardId: item.visionBoardId,
+            reflectionSessionId: item.reflectionSessionId,
+            imageUrl: item.imageUrl,
+            order: item.order,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            affirmation: item.reflectionSession.approvedAffirmation || item.reflectionSession.generatedAffirmation,
+            reflectionSession: {
+                id: item.reflectionSession.id,
+                prompt: item.reflectionSession.prompt,
+                category: item.reflectionSession.category,
+            },
+        }));
+
+        return this.Results({
+            data,
+            pagination: {
+                page: pageNumber,
+                limit: pageSize,
+                total: totalCount,
+                totalPages,
+                hasNextPage: pageNumber < totalPages,
+                hasPreviousPage: pageNumber > 1,
+            },
+        });
+    }
+
+    /**
+     * Get single vision by ID
+     */
+    async getVisionById(firebaseId: string, visionId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Get or create vision board to ensure user has one
+        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+
+        const visionItem = await this.prisma.visionBoardItem.findFirst({
+            where: {
+                id: visionId,
+                visionBoardId: visionBoard.id,
+            },
+            include: {
+                reflectionSession: {
+                    include: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!visionItem) {
+            return this.HandleError(new NotFoundException('Vision not found'));
+        }
+
+        // Format response
+        const response = {
+            id: visionItem.id,
+            visionBoardId: visionItem.visionBoardId,
+            reflectionSessionId: visionItem.reflectionSessionId,
+            imageUrl: visionItem.imageUrl,
+            order: visionItem.order,
+            createdAt: visionItem.createdAt,
+            updatedAt: visionItem.updatedAt,
+            affirmation: visionItem.reflectionSession.approvedAffirmation || visionItem.reflectionSession.generatedAffirmation,
+            reflectionSession: {
+                id: visionItem.reflectionSession.id,
+                prompt: visionItem.reflectionSession.prompt,
+                category: visionItem.reflectionSession.category,
+            },
+        };
+
+        return this.Results(response);
+    }
+
+    /**
+     * Upload/update video for vision board
+     */
+    async uploadVisionBoardVideo(firebaseId: string, videoFile: Express.Multer.File) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Get or create vision board
+        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+
+        // Upload video
+        let videoUrl: string;
+        try {
+            const uploadResult = await this.storageService.uploadFile(
+                videoFile,
+                FileType.VIDEO,
+                user.id,
+                'vision-board/videos',
+            );
+            videoUrl = uploadResult.url;
+        } catch (error) {
+            return this.HandleError(
+                new BadRequestException(`Failed to upload video: ${error.message}`),
+            );
+        }
+
+        // Update vision board with video URL
+        const updatedBoard = await this.prisma.visionBoard.update({
+            where: { id: visionBoard.id },
+            data: { videoUrl },
+        });
+
+        return this.Results({
+            id: updatedBoard.id,
+            userId: updatedBoard.userId,
+            videoUrl: updatedBoard.videoUrl,
+            createdAt: updatedBoard.createdAt,
+            updatedAt: updatedBoard.updatedAt,
+        });
+    }
+
+    /**
+     * Get video URL for user's vision board
+     */
+    async getVideo(firebaseId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+
+        return this.Results({
+            videoUrl: visionBoard.videoUrl || null,
+        });
+    }
+
+    /**
+     * Update image for a vision
+     */
+    async updateVisionImage(
+        firebaseId: string,
+        visionId: string,
+        imageFile: Express.Multer.File,
+    ) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+
+        const visionItem = await this.prisma.visionBoardItem.findFirst({
+            where: {
+                id: visionId,
+                visionBoardId: visionBoard.id,
+            },
+            include: {
+                reflectionSession: {
+                    include: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!visionItem) {
+            return this.HandleError(new NotFoundException('Vision not found'));
+        }
+
+        // Upload new image
+        let imageUrl: string;
+        try {
+            const uploadResult = await this.storageService.uploadFile(
+                imageFile,
+                FileType.IMAGE,
+                user.id,
+                'vision-board/images',
+            );
+            imageUrl = uploadResult.url;
+        } catch (error) {
+            return this.HandleError(
+                new BadRequestException(`Failed to upload image: ${error.message}`),
+            );
+        }
+
+        // Update vision item with new image
+        const updatedItem = await this.prisma.visionBoardItem.update({
+            where: { id: visionId },
+            data: { imageUrl },
+            include: {
+                reflectionSession: {
+                    include: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        // Format response
+        const response = {
+            id: updatedItem.id,
+            visionBoardId: updatedItem.visionBoardId,
+            reflectionSessionId: updatedItem.reflectionSessionId,
+            imageUrl: updatedItem.imageUrl,
+            order: updatedItem.order,
+            createdAt: updatedItem.createdAt,
+            updatedAt: updatedItem.updatedAt,
+            affirmation: updatedItem.reflectionSession.approvedAffirmation || updatedItem.reflectionSession.generatedAffirmation,
+            reflectionSession: {
+                id: updatedItem.reflectionSession.id,
+                prompt: updatedItem.reflectionSession.prompt,
+                category: updatedItem.reflectionSession.category,
+            },
+        };
+
+        return this.Results(response);
+    }
+
+    /**
+     * Remove vision from board
+     */
+    async removeVision(firebaseId: string, visionId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+
+        const visionItem = await this.prisma.visionBoardItem.findFirst({
+            where: {
+                id: visionId,
+                visionBoardId: visionBoard.id,
+            },
+        });
+
+        if (!visionItem) {
+            return this.HandleError(new NotFoundException('Vision not found'));
+        }
+
+        await this.prisma.visionBoardItem.delete({
+            where: { id: visionId },
+        });
+
+        return this.Results({ message: 'Vision removed successfully' });
+    }
+
+    private async getUserByFirebaseId(firebaseId: string) {
+        return this.prisma.user.findUnique({
+            where: { firebaseId },
+        });
+    }
+}
+

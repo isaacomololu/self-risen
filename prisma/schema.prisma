@@ -31,6 +31,7 @@ model User {
   updatedAt          DateTime            @updatedAt
   wheelOfLife        WheelOfLife?
   reflectionSessions ReflectionSession[]
+  visionBoard        VisionBoard?
 }
 
 model Notification {
@@ -227,6 +228,7 @@ model ReflectionSession {
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
   completedAt             DateTime?
+  visionBoardItem         VisionBoardItem?
 
   @@index([userId])
   @@index([categoryId])
@@ -234,6 +236,34 @@ model ReflectionSession {
   @@index([userId, status])
   @@index([userId, createdAt])
   @@index([expiresAt, status])
+}
+
+model VisionBoard {
+  id        String            @id @default(uuid())
+  userId    String            @unique
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoUrl  String?
+  items     VisionBoardItem[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId])
+}
+
+model VisionBoardItem {
+  id                  String            @id @default(uuid())
+  visionBoardId       String
+  visionBoard         VisionBoard       @relation(fields: [visionBoardId], references: [id], onDelete: Cascade)
+  reflectionSessionId String            @unique
+  reflectionSession   ReflectionSession @relation(fields: [reflectionSessionId], references: [id], onDelete: Cascade)
+  imageUrl            String?
+  order               Int?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([visionBoardId])
+  @@index([reflectionSessionId])
+  @@index([visionBoardId, order])
 }
 
 enum ReflectionSessionStatus {
