@@ -99,7 +99,7 @@ services:
         echo 'Waiting for database to be ready...' &&
         sleep 5 &&
         npx prisma migrate deploy &&
-        node dist/main.js
+        node dist/src/main.js
       "
 
 volumes:

@@ -17,6 +17,7 @@ export class SessionExpirationService extends BaseService {
     @Cron('*/1 * * * *') // Every minute
     async checkAndCompleteExpiredSessions() {
         this.logger.log('Checking and completing expired sessions');
+        console.log('Checking and completing expired sessions');
         try {
             const now = new Date();
 
@@ -59,6 +60,7 @@ export class SessionExpirationService extends BaseService {
             await Promise.all(expiredSessions.map(async (session) => {
                 await this.updateUserSessions(session.userId);
             }));
+            console.log('Completed expired sessions');
 
             this.logger.log(`Completed ${result.count} expired session(s)`);
         } catch (error) {
