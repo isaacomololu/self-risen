@@ -18,7 +18,6 @@ export class EmailService extends BaseService {
             auth: {
                 type: 'OAuth2',
                 user: config.MAIL_USERNAME,
-                pass: config.MAIL_PASSWORD,
                 clientId: config.OAUTH_CLIENTID,
                 clientSecret: config.OAUTH_CLIENT_SECRET,
                 refreshToken: config.OAUTH_REFRESH_TOKEN
@@ -34,7 +33,14 @@ export class EmailService extends BaseService {
             html: `<p>Click the link below to reset your password:</p><a href="${resetLink}">${resetLink}</a>`
         }
 
-        await this.transporter.sendMail(mailOptions);
+        try {
+            await this.transporter.sendMail(mailOptions);
+        } catch (error) {
+            if (error.code === 'EAUTH' || error.message?.includes('invalid_grant')) {
+                throw new Error(`Gmail OAuth authentication failed. Please verify your OAuth refresh token is valid and not expired. Error: ${error.message || error}`);
+            }
+            throw error;
+        }
     }
 
     async sendPasswordResetOtp(email: string, otp: string) {
@@ -56,7 +62,18 @@ export class EmailService extends BaseService {
             `
         }
 
-        await this.transporter.sendMail(mailOptions);
+        try {
+            await this.transporter.sendMail(mailOptions);
+        } catch (error) {
+            // Log detailed error information for OAuth issues
+            if (error.response) {
+                throw new Error(`Email OAuth error: ${error.response} - ${error.message || error}`);
+            }
+            if (error.code === 'EAUTH' || error.message?.includes('invalid_grant')) {
+                throw new Error(`Gmail OAuth authentication failed. Please verify your OAuth refresh token is valid and not expired. Error: ${error.message || error}`);
+            }
+            throw error;
+        }
     }
 
     async sendPasswordResetConfirmation(email: string, name: string) {
@@ -72,6 +89,13 @@ export class EmailService extends BaseService {
             `
         }
 
-        await this.transporter.sendMail(mailOptions);
+        try {
+            await this.transporter.sendMail(mailOptions);
+        } catch (error) {
+            if (error.code === 'EAUTH' || error.message?.includes('invalid_grant')) {
+                throw new Error(`Gmail OAuth authentication failed. Please verify your OAuth refresh token is valid and not expired. Error: ${error.message || error}`);
+            }
+            throw error;
+        }
     }
 }
