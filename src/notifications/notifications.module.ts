@@ -15,18 +15,27 @@ import { TwilioAdapter } from './adapters/sms/twilio.adapter';
 import { FirebaseAdapter } from './adapters/push/firebase.adapter';
 import { INotificationService } from './interfaces/notification.interface';
 import { NotificationChannelTypeEnum } from './enums/notification.enum';
+import { IEmailChannelAdapter } from './interfaces/adapter.interface';
 
 @Module({
   imports: [
     ConfigModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        redis: {
+      useFactory: (configService: ConfigService) => {
+        const redisConfig: any = {
           host: configService.get<string>('REDIS_HOST', 'localhost'),
           port: configService.get<number>('REDIS_PORT', 6379),
-        },
-      }),
+        };
+
+        // Add password if provided (required for Railway Redis)
+        const password = configService.get<string>('REDIS_PASSWORD');
+        if (password) {
+          redisConfig.password = password;
+        }
+
+        return { redis: redisConfig };
+      },
       inject: [ConfigService],
     }),
     BullModule.registerQueue({
@@ -74,32 +83,32 @@ import { NotificationChannelTypeEnum } from './enums/notification.enum';
         configService: ConfigService,
       ) => {
         const map = new Map();
-        
+
         // Email adapters: prioritize Gmail if configured, fallback to Mailgun
-        const emailAdapters = [];
-        const hasGmailConfig = 
+        const emailAdapters: IEmailChannelAdapter[] = [];
+        const hasGmailConfig =
           configService.get<string>('MAIL_USERNAME') &&
           configService.get<string>('OAUTH_CLIENTID') &&
           configService.get<string>('OAUTH_CLIENT_SECRET') &&
           configService.get<string>('OAUTH_REFRESH_TOKEN');
-        
+
         const hasMailgunConfig =
           configService.get<string>('MAILGUN_API_KEY') &&
           configService.get<string>('MAILGUN_DOMAIN') &&
           configService.get<string>('MAILGUN_FROM_EMAIL');
-        
+
         if (hasGmailConfig) {
           emailAdapters.push(gmail);
         }
         if (hasMailgunConfig) {
           emailAdapters.push(mailgun);
         }
-        
+
         // Default to Gmail if no adapters configured (will fail gracefully)
         if (emailAdapters.length === 0) {
           emailAdapters.push(gmail);
         }
-        
+
         map.set(NotificationChannelTypeEnum.EMAIL, emailAdapters);
         map.set(NotificationChannelTypeEnum.SMS, [twilio]);
         map.set(NotificationChannelTypeEnum.PUSH, [firebase]);

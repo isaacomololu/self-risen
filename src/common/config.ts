@@ -108,6 +108,7 @@ class Config {
     // Redis Configuration
     REDIS_HOST?: string;
     REDIS_PORT?: number;
+    REDIS_PASSWORD?: string;
 
     // Mailgun Configuration
     MAILGUN_API_KEY?: string;

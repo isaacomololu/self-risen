@@ -52,7 +52,7 @@ services:
       # Database
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/self_risen?schema=public
       
-      # Redis
+      # Redis (use 'redis' for local Docker, Railway will override with env vars)
       REDIS_HOST: redis
       REDIS_PORT: 6379
       
