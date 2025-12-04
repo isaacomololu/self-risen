@@ -70,6 +70,8 @@ export class TemplateService {
         'sms_user_onboarding_welcome',
       [`${NotificationTypeEnum.USER_ONBOARDING_WELCOME}_${NotificationChannelTypeEnum.PUSH}`]:
         'push_user_onboarding_welcome',
+      [`${NotificationTypeEnum.PASSWORD_RESET_OTP}_${NotificationChannelTypeEnum.EMAIL}`]:
+        'email_password_reset_otp',
     };
 
     return (

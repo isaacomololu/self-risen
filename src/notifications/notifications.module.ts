@@ -10,6 +10,7 @@ import { TemplateService } from './services/template.service';
 import { AuditLogRepository } from './repositories/audit-log.repository';
 import { DeadLetterQueueRepository } from './repositories/dead-letter-queue.repository';
 import { MailgunAdapter } from './adapters/email/mailgun.adapter';
+import { GmailAdapter } from './adapters/email/gmail.adapter';
 import { TwilioAdapter } from './adapters/sms/twilio.adapter';
 import { FirebaseAdapter } from './adapters/push/firebase.adapter';
 import { INotificationService } from './interfaces/notification.interface';
@@ -58,6 +59,7 @@ import { NotificationChannelTypeEnum } from './enums/notification.enum';
 
     // Adapters
     MailgunAdapter,
+    GmailAdapter,
     TwilioAdapter,
     FirebaseAdapter,
 
@@ -66,16 +68,44 @@ import { NotificationChannelTypeEnum } from './enums/notification.enum';
       provide: 'NOTIFICATION_CHANNEL_ADAPTERS',
       useFactory: (
         mailgun: MailgunAdapter,
+        gmail: GmailAdapter,
         twilio: TwilioAdapter,
         firebase: FirebaseAdapter,
+        configService: ConfigService,
       ) => {
         const map = new Map();
-        map.set(NotificationChannelTypeEnum.EMAIL, [mailgun]);
+        
+        // Email adapters: prioritize Gmail if configured, fallback to Mailgun
+        const emailAdapters = [];
+        const hasGmailConfig = 
+          configService.get<string>('MAIL_USERNAME') &&
+          configService.get<string>('OAUTH_CLIENTID') &&
+          configService.get<string>('OAUTH_CLIENT_SECRET') &&
+          configService.get<string>('OAUTH_REFRESH_TOKEN');
+        
+        const hasMailgunConfig =
+          configService.get<string>('MAILGUN_API_KEY') &&
+          configService.get<string>('MAILGUN_DOMAIN') &&
+          configService.get<string>('MAILGUN_FROM_EMAIL');
+        
+        if (hasGmailConfig) {
+          emailAdapters.push(gmail);
+        }
+        if (hasMailgunConfig) {
+          emailAdapters.push(mailgun);
+        }
+        
+        // Default to Gmail if no adapters configured (will fail gracefully)
+        if (emailAdapters.length === 0) {
+          emailAdapters.push(gmail);
+        }
+        
+        map.set(NotificationChannelTypeEnum.EMAIL, emailAdapters);
         map.set(NotificationChannelTypeEnum.SMS, [twilio]);
         map.set(NotificationChannelTypeEnum.PUSH, [firebase]);
         return map;
       },
-      inject: [MailgunAdapter, TwilioAdapter, FirebaseAdapter],
+      inject: [MailgunAdapter, GmailAdapter, TwilioAdapter, FirebaseAdapter, ConfigService],
     },
   ],
   exports: [INotificationService, NotificationsService],

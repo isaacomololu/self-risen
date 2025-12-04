@@ -18,9 +18,10 @@ import {
 } from './dto';
 import { auth } from 'firebase-admin';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
-import { NotificationTypeEnum } from 'src/notifications/enums/notification.enum';
+import { NotificationTypeEnum, NotificationChannelTypeEnum, NotificationStatusEnum } from 'src/notifications/enums/notification.enum';
 import { EmailService } from 'src/common/email/email.service';
 import { generateOtp, hashOtp, verifyOtp } from './utils/otp.util';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthService extends BaseService {
@@ -355,7 +356,31 @@ export class AuthService extends BaseService {
 
       // Send OTP via email
       try {
-        await this.emailService.sendPasswordResetOtp(email, otp);
+        const requestId = `pwd-reset-${email}-${Date.now()}-${randomUUID()}`;
+        const results = await this.notificationService.notifyExternalUser({
+          email,
+          type: NotificationTypeEnum.PASSWORD_RESET_OTP,
+          requestId,
+          channels: [{ type: NotificationChannelTypeEnum.EMAIL }],
+          metadata: {
+            title: 'Password Reset OTP',
+            body: `Your password reset OTP is: ${otp}`,
+            otp,
+            email,
+          },
+        });
+
+        // Check if notification was queued successfully
+        const emailResult = results.find(
+          (r) => r.channel.type === NotificationChannelTypeEnum.EMAIL
+        );
+
+        if (!emailResult || emailResult.status === NotificationStatusEnum.FAILED) {
+          throw new Error(
+            emailResult?.error || 'Failed to queue password reset email'
+          );
+        }
+
         logger.log(`Password reset OTP sent to email: ${email}`);
       } catch (emailError) {
         logger.error(`Failed to send password reset OTP email: ${emailError.message || emailError}`);
