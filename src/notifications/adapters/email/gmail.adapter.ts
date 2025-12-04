@@ -48,6 +48,9 @@ export class GmailAdapter extends IEmailChannelAdapter {
   ): Promise<NotificationChannelResponse> {
     try {
       const mailUsername = this.configService.get<string>('MAIL_USERNAME');
+      const oauthClientId = this.configService.get<string>('OAUTH_CLIENTID');
+      const oauthClientSecret = this.configService.get<string>('OAUTH_CLIENT_SECRET');
+      const oauthRefreshToken = this.configService.get<string>('OAUTH_REFRESH_TOKEN');
 
       if (!mailUsername) {
         return {
@@ -56,11 +59,31 @@ export class GmailAdapter extends IEmailChannelAdapter {
         };
       }
 
-      if (!this.transporter) {
-        return {
-          status: NotificationStatusEnum.FAILED,
-          error: 'Gmail client not initialized. Check OAuth credentials.',
-        };
+      // Re-initialize transporter if not initialized or credentials changed
+      if (!this.transporter || !oauthClientId || !oauthClientSecret || !oauthRefreshToken) {
+        if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
+          this.transporter = createTransport({
+            service: 'gmail',
+            auth: {
+              type: 'OAuth2',
+              user: mailUsername,
+              clientId: oauthClientId,
+              clientSecret: oauthClientSecret,
+              refreshToken: oauthRefreshToken,
+            },
+            connectionTimeout: 10000,
+            socketTimeout: 30000,
+            greetingTimeout: 10000,
+            pool: true,
+            maxConnections: 5,
+            maxMessages: 100,
+          });
+        } else {
+          return {
+            status: NotificationStatusEnum.FAILED,
+            error: 'Gmail client not initialized. Missing OAuth credentials (OAUTH_CLIENTID, OAUTH_CLIENT_SECRET, or OAUTH_REFRESH_TOKEN).',
+          };
+        }
       }
 
       const mailOptions = {
@@ -90,20 +113,30 @@ export class GmailAdapter extends IEmailChannelAdapter {
         messageId: response.messageId,
       };
     } catch (error: any) {
+      // Log the actual error for debugging
+      console.error('[GmailAdapter] Send error:', {
+        code: error?.code,
+        message: error?.message,
+        response: error?.response,
+        command: error?.command,
+      });
+
       // Handle timeout errors
       if (
         error?.message?.includes('timeout') ||
         error?.code === 'ETIMEDOUT' ||
-        error?.code === 'ESOCKETTIMEDOUT'
+        error?.code === 'ESOCKETTIMEDOUT' ||
+        error?.code === 'ECONNREFUSED' ||
+        error?.code === 'ENOTFOUND'
       ) {
         return {
           status: NotificationStatusEnum.FAILED,
-          error: `Email send timed out. This may be due to network issues or Gmail service delays. Please try again later.`,
+          error: `Email send timed out or connection failed. Check network connectivity and Gmail OAuth credentials. Original error: ${error?.code || error?.message}`,
         };
       }
 
       // Handle OAuth authentication errors
-      if (error?.code === 'EAUTH' || error?.message?.includes('invalid_grant')) {
+      if (error?.code === 'EAUTH' || error?.message?.includes('invalid_grant') || error?.message?.includes('unauthorized')) {
         return {
           status: NotificationStatusEnum.FAILED,
           error: `Gmail OAuth authentication failed. Please verify your OAuth refresh token is valid and not expired. Error: ${error?.message || String(error)}`,
