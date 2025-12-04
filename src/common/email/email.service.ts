@@ -21,7 +21,15 @@ export class EmailService extends BaseService {
                 clientId: config.OAUTH_CLIENTID,
                 clientSecret: config.OAUTH_CLIENT_SECRET,
                 refreshToken: config.OAUTH_REFRESH_TOKEN
-            }
+            },
+            // Timeout configurations to prevent hanging in production
+            connectionTimeout: 10000, // 10 seconds to establish connection
+            socketTimeout: 30000, // 30 seconds for socket operations
+            greetingTimeout: 10000, // 10 seconds for SMTP greeting
+            // Pool connections for better performance
+            pool: true,
+            maxConnections: 5,
+            maxMessages: 100
         });
     }
 
@@ -34,8 +42,18 @@ export class EmailService extends BaseService {
         }
 
         try {
-            await this.transporter.sendMail(mailOptions);
+            // Add timeout wrapper to prevent indefinite hanging
+            await Promise.race([
+                this.transporter.sendMail(mailOptions),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Email send timeout: Operation exceeded 30 seconds')), 30000)
+                )
+            ]);
         } catch (error) {
+            // Handle timeout errors
+            if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT' || error.code === 'ESOCKETTIMEDOUT') {
+                throw new Error(`Email send timed out. This may be due to network issues or Gmail service delays. Please try again later.`);
+            }
             if (error.code === 'EAUTH' || error.message?.includes('invalid_grant')) {
                 throw new Error(`Gmail OAuth authentication failed. Please verify your OAuth refresh token is valid and not expired. Error: ${error.message || error}`);
             }
@@ -63,8 +81,18 @@ export class EmailService extends BaseService {
         }
 
         try {
-            await this.transporter.sendMail(mailOptions);
+            // Add timeout wrapper to prevent indefinite hanging
+            await Promise.race([
+                this.transporter.sendMail(mailOptions),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Email send timeout: Operation exceeded 30 seconds')), 30000)
+                )
+            ]);
         } catch (error) {
+            // Handle timeout errors
+            if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT' || error.code === 'ESOCKETTIMEDOUT') {
+                throw new Error(`Email send timed out. This may be due to network issues or Gmail service delays. Please try again later.`);
+            }
             // Log detailed error information for OAuth issues
             if (error.response) {
                 throw new Error(`Email OAuth error: ${error.response} - ${error.message || error}`);
@@ -90,8 +118,18 @@ export class EmailService extends BaseService {
         }
 
         try {
-            await this.transporter.sendMail(mailOptions);
+            // Add timeout wrapper to prevent indefinite hanging
+            await Promise.race([
+                this.transporter.sendMail(mailOptions),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Email send timeout: Operation exceeded 30 seconds')), 30000)
+                )
+            ]);
         } catch (error) {
+            // Handle timeout errors
+            if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT' || error.code === 'ESOCKETTIMEDOUT') {
+                throw new Error(`Email send timed out. This may be due to network issues or Gmail service delays. Please try again later.`);
+            }
             if (error.code === 'EAUTH' || error.message?.includes('invalid_grant')) {
                 throw new Error(`Gmail OAuth authentication failed. Please verify your OAuth refresh token is valid and not expired. Error: ${error.message || error}`);
             }
