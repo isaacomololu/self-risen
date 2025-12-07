@@ -18,20 +18,47 @@ export class SessionExpirationService extends BaseService {
     }
 
     /**
-     * Cron job that runs every minute to check and complete expired sessions
+     * Cron job that runs every minute to check and complete expired waves
+     * Completes sessions when their active wave expires
      */
     @Cron('*/1 * * * *') // Every minute
-    async checkAndCompleteExpiredSessions() {
-        this.logger.log('Checking and completing expired sessions');
-        console.log('Checking and completing expired sessions');
+    async checkAndCompleteExpiredWaves() {
+        this.logger.log('Checking and completing expired waves');
+        console.log('Checking and completing expired waves');
         try {
             const now = new Date();
 
-            // Find all sessions that have expired and are not yet completed
+            // Find all active waves that have expired
+            const expiredWaves = await this.prisma.wave.findMany({
+                where: {
+                    isActive: true,
+                    endDate: {
+                        lte: now,
+                    },
+                },
+                include: {
+                    session: {
+                        select: {
+                            id: true,
+                            userId: true,
+                            status: true,
+                        },
+                    },
+                },
+            });
+
+            if (expiredWaves.length === 0) {
+                return; // No expired waves to process
+            }
+
+            // Get unique session IDs from expired waves
+            const sessionIds = [...new Set(expiredWaves.map((w) => w.sessionId))];
+
+            // Find sessions that have expired waves and are not yet completed
             const expiredSessions = await this.prisma.reflectionSession.findMany({
                 where: {
-                    expiresAt: {
-                        lte: now,
+                    id: {
+                        in: sessionIds,
                     },
                     status: {
                         not: 'COMPLETED',
@@ -49,6 +76,18 @@ export class SessionExpirationService extends BaseService {
             }
 
             this.logger.log(`Found ${expiredSessions.length} expired session(s) to complete`);
+
+            // Deactivate expired waves
+            await this.prisma.wave.updateMany({
+                where: {
+                    id: {
+                        in: expiredWaves.map((w) => w.id),
+                    },
+                },
+                data: {
+                    isActive: false,
+                },
+            });
 
             // Update all expired sessions to COMPLETED status
             const result = await this.prisma.reflectionSession.updateMany({

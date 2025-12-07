@@ -2,6 +2,8 @@ import {
     Controller,
     Get,
     Post,
+    Put,
+    Delete,
     Body,
     Param,
     Query,
@@ -26,7 +28,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { ReflectionService } from './reflection.service';
-import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -421,6 +423,108 @@ export class ReflectionController extends BaseController {
 
         return this.response({
             message: 'Playback tracked successfully',
+            data: result.data,
+        });
+    }
+
+    @Post('waves')
+    @ApiOperation({
+        summary: 'Create a wave for an existing session',
+        description: 'Creates a new wave (listening period) for an existing reflection session. Blocks creation if session already has an active wave. Session must have an approved or generated affirmation.',
+    })
+    @ApiBody({ type: CreateWaveDto })
+    @ApiResponse({
+        status: 201,
+        description: 'Wave created successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Session already has an active wave or missing affirmation',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User or session not found',
+    })
+    async createWave(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Body() dto: CreateWaveDto,
+    ) {
+        const result = await this.reflectionService.createWave(user.uid, dto);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Wave created successfully',
+            data: result.data,
+        });
+    }
+
+    @Put('waves/:waveId')
+    @ApiOperation({
+        summary: 'Update a wave',
+        description: 'Updates an existing wave. Can modify duration or active status. When duration is updated, the end date is automatically recalculated from the start date. If activating a wave, ensures no other active wave exists for the session.',
+    })
+    @ApiParam({
+        name: 'waveId',
+        description: 'The unique identifier of the wave',
+        example: 'wave-id-123',
+    })
+    @ApiBody({ type: UpdateWaveDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Wave updated successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Cannot activate wave - session already has another active wave',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Wave not found',
+    })
+    async updateWave(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('waveId') waveId: string,
+        @Body() dto: UpdateWaveDto,
+    ) {
+        const result = await this.reflectionService.updateWave(user.uid, waveId, dto);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Wave updated successfully',
+            data: result.data,
+        });
+    }
+
+    @Delete('waves/:waveId')
+    @ApiOperation({
+        summary: 'Delete a wave',
+        description: 'Deletes a wave from a reflection session. Returns the updated session.',
+    })
+    @ApiParam({
+        name: 'waveId',
+        description: 'The unique identifier of the wave',
+        example: 'wave-id-123',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Wave deleted successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Wave not found',
+    })
+    async deleteWave(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('waveId') waveId: string,
+    ) {
+        const result = await this.reflectionService.deleteWave(user.uid, waveId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Wave deleted successfully',
             data: result.data,
         });
     }

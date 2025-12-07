@@ -5,7 +5,7 @@ import { StorageService, FileType } from 'src/common/storage/storage.service';
 import { TranscriptionService } from './services/transcription.service';
 import { NlpTransformationService } from './services/nlp-transformation.service';
 import { TextToSpeechService } from './services/text-to-speech.service';
-import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto } from './dto';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
 import { NotificationTypeEnum, NotificationChannelTypeEnum } from 'src/notifications/enums/notification.enum';
 import { randomUUID } from 'crypto';
@@ -73,19 +73,12 @@ export class ReflectionService extends BaseService {
 
         const prompt = this.generatePrompt(category.name);
 
-        const sessionDurationDays = dto.sessionDurationDays || 7; // Default to 7 days
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + sessionDurationDays);
-
-        // Create reflection session
         const session = await this.prisma.reflectionSession.create({
             data: {
                 userId: user.id,
                 categoryId: dto.categoryId,
                 wheelFocusId: dto.wheelFocusId,
                 prompt,
-                sessionDurationDays,
-                expiresAt,
                 status: 'PENDING',
             },
             include: {
@@ -729,6 +722,278 @@ export class ReflectionService extends BaseService {
             return session.aiAffirmationAudioUrl;
         }
         return null;
+    }
+
+    /**
+     * Create a wave for an existing session
+     * Blocks creation if session already has an active wave
+     */
+    async createWave(firebaseId: string, dto: CreateWaveDto) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Validate session ownership
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: dto.sessionId,
+                userId: user.id,
+            },
+            include: {
+                waves: {
+                    where: {
+                        isActive: true,
+                    },
+                },
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        // Check if session already has an active wave
+        if (session.waves && session.waves.length > 0) {
+            return this.HandleError(
+                new BadRequestException(
+                    'Cannot create a new wave. Session already has an active wave. Please wait for the current wave to end or deactivate it first.',
+                ),
+            );
+        }
+
+        // Validate that session has an affirmation (required for waves)
+        if (!session.approvedAffirmation && !session.generatedAffirmation) {
+            return this.HandleError(
+                new BadRequestException(
+                    'Cannot create a wave. Session must have an approved or generated affirmation.',
+                ),
+            );
+        }
+
+        const durationDays = dto.durationDays || 20; // Default to 20 days
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + durationDays);
+
+        // Create wave
+        await this.prisma.wave.create({
+            data: {
+                sessionId: dto.sessionId,
+                startDate,
+                endDate,
+                durationDays,
+                isActive: true,
+            },
+        });
+
+        // Fetch session with updated waves for response
+        const sessionWithWave = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: dto.sessionId,
+                userId: user.id,
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                waves: {
+                    where: {
+                        isActive: true,
+                    },
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                    take: 1,
+                },
+            },
+        });
+
+        // Add computed affirmationAudioUrl field
+        const sessionWithAudio = {
+            ...sessionWithWave,
+            affirmationAudioUrl: this.getAffirmationAudioUrl(sessionWithWave),
+        };
+
+        return this.Results(sessionWithAudio);
+    }
+
+    /**
+     * Update a wave
+     */
+    async updateWave(firebaseId: string, waveId: string, dto: UpdateWaveDto) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Find wave and validate ownership through session
+        const wave = await this.prisma.wave.findFirst({
+            where: {
+                id: waveId,
+            },
+            include: {
+                session: {
+                    select: {
+                        id: true,
+                        userId: true,
+                    },
+                },
+            },
+        });
+
+        if (!wave) {
+            return this.HandleError(new NotFoundException('Wave not found'));
+        }
+
+        if (wave.session.userId !== user.id) {
+            return this.HandleError(new NotFoundException('Wave not found'));
+        }
+
+        // Prepare update data
+        const updateData: any = {};
+
+        if (dto.durationDays !== undefined) {
+            updateData.durationDays = dto.durationDays;
+            // Recalculate endDate from existing startDate when duration is updated
+            const newEndDate = new Date(wave.startDate);
+            newEndDate.setDate(newEndDate.getDate() + dto.durationDays);
+            updateData.endDate = newEndDate;
+        }
+
+        if (dto.isActive !== undefined) {
+            updateData.isActive = dto.isActive;
+
+            // If activating a wave, check if session already has an active wave
+            if (dto.isActive === true) {
+                const activeWave = await this.prisma.wave.findFirst({
+                    where: {
+                        sessionId: wave.sessionId,
+                        isActive: true,
+                        id: {
+                            not: waveId, // Exclude current wave
+                        },
+                    },
+                });
+
+                if (activeWave) {
+                    return this.HandleError(
+                        new BadRequestException(
+                            'Cannot activate this wave. Session already has another active wave.',
+                        ),
+                    );
+                }
+            }
+        }
+
+        // Update wave
+        const updatedWave = await this.prisma.wave.update({
+            where: { id: waveId },
+            data: updateData,
+            include: {
+                session: {
+                    include: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                        waves: {
+                            where: {
+                                isActive: true,
+                            },
+                            orderBy: {
+                                createdAt: 'desc',
+                            },
+                            take: 1,
+                        },
+                    },
+                },
+            },
+        });
+
+        // Add computed affirmationAudioUrl field
+        const sessionWithAudio = {
+            ...updatedWave.session,
+            affirmationAudioUrl: this.getAffirmationAudioUrl(updatedWave.session),
+        };
+
+        return this.Results(sessionWithAudio);
+    }
+
+    /**
+     * Delete a wave
+     */
+    async deleteWave(firebaseId: string, waveId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Find wave and validate ownership through session
+        const wave = await this.prisma.wave.findFirst({
+            where: {
+                id: waveId,
+            },
+            include: {
+                session: {
+                    select: {
+                        id: true,
+                        userId: true,
+                    },
+                },
+            },
+        });
+
+        if (!wave) {
+            return this.HandleError(new NotFoundException('Wave not found'));
+        }
+
+        if (wave.session.userId !== user.id) {
+            return this.HandleError(new NotFoundException('Wave not found'));
+        }
+
+        // Delete wave
+        await this.prisma.wave.delete({
+            where: { id: waveId },
+        });
+
+        // Fetch session with updated waves for response
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: wave.sessionId,
+                userId: user.id,
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                waves: {
+                    where: {
+                        isActive: true,
+                    },
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                    take: 1,
+                },
+            },
+        });
+
+        // Add computed affirmationAudioUrl field
+        const sessionWithAudio = {
+            ...session,
+            affirmationAudioUrl: this.getAffirmationAudioUrl(session),
+        };
+
+        return this.Results(sessionWithAudio);
     }
 
     /**

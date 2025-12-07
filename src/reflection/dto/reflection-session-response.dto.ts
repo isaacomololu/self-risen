@@ -46,11 +46,17 @@ export class ReflectionSessionResponseDto {
     @ApiProperty({ required: false })
     completedAt?: Date;
 
-    @ApiProperty({ required: false })
-    sessionDurationDays?: number;
-
-    @ApiProperty({ required: false })
-    expiresAt?: Date;
+    @ApiProperty({ required: false, description: 'Active wave for this session' })
+    waves?: Array<{
+        id: string;
+        sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        durationDays: number;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
 
     @ApiProperty({ required: false })
     aiAffirmationAudioUrl?: string;

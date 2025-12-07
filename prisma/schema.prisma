@@ -204,8 +204,6 @@ model ReflectionSession {
   limitingBelief          String?
   generatedAffirmation    String?
   approvedAffirmation     String?
-  sessionDurationDays     Int?
-  expiresAt               DateTime?
   aiAffirmationAudioUrl   String?
   userAffirmationAudioUrl String?
   playbackCount           Int                     @default(0)
@@ -217,13 +215,28 @@ model ReflectionSession {
   updatedAt               DateTime                @updatedAt
   completedAt             DateTime?
   visionBoardItem         VisionBoardItem?
+  waves                   Wave[]
 
   @@index([userId])
   @@index([categoryId])
   @@index([wheelFocusId])
   @@index([userId, status])
   @@index([userId, createdAt])
-  @@index([expiresAt, status])
+}
+
+model Wave {
+  id           String            @id @default(uuid())
+  sessionId    String
+  session      ReflectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  startDate    DateTime
+  endDate      DateTime
+  durationDays Int
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([sessionId, isActive])
+  @@index([endDate, isActive])
 }
 
 model VisionBoard {
