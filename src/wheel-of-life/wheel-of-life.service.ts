@@ -374,44 +374,44 @@ export class WheelOfLifeService extends BaseService {
         });
     }
 
-    async completeFocus(firebaseId: string, focusId: string) {
-        const user = await this.getUserByFirebaseId(firebaseId);
-        if (!user) {
-            return this.HandleError(new NotFoundException('User not found'));
-        }
+    // async completeFocus(firebaseId: string, focusId: string) {
+    //     const user = await this.getUserByFirebaseId(firebaseId);
+    //     if (!user) {
+    //         return this.HandleError(new NotFoundException('User not found'));
+    //     }
 
-        const wheel = await this.getWheelByUserId(user.id);
-        if (!wheel) {
-            return this.HandleError(new NotFoundException('Wheel not found'));
-        }
+    //     const wheel = await this.getWheelByUserId(user.id);
+    //     if (!wheel) {
+    //         return this.HandleError(new NotFoundException('Wheel not found'));
+    //     }
 
-        // Validate focus belongs to user's wheel
-        const focus = await this.prisma.wheelFocus.findFirst({
-            where: {
-                id: focusId,
-                wheelId: wheel.id,
-            },
-        });
+    //     // Validate focus belongs to user's wheel
+    //     const focus = await this.prisma.wheelFocus.findFirst({
+    //         where: {
+    //             id: focusId,
+    //             wheelId: wheel.id,
+    //         },
+    //     });
 
-        if (!focus) {
-            return this.HandleError(new NotFoundException('Focus not found'));
-        }
+    //     if (!focus) {
+    //         return this.HandleError(new NotFoundException('Focus not found'));
+    //     }
 
-        const completedAt = new Date();
-        const updated = await this.prisma.wheelFocus.update({
-            where: { id: focusId },
-            data: {
-                isActive: false,
-                completedAt: completedAt ? new Date(completedAt) : null
-            },
-            include: {
-                category: true,
-                wheelAssessment: true,
-            },
-        });
+    //     const completedAt = new Date();
+    //     const updated = await this.prisma.wheelFocus.update({
+    //         where: { id: focusId },
+    //         data: {
+    //             isActive: false,
+    //             completedAt: completedAt ? new Date(completedAt) : null
+    //         },
+    //         include: {
+    //             category: true,
+    //             wheelAssessment: true,
+    //         },
+    //     });
 
-        return this.Results(updated);
-    }
+    //     return this.Results(updated);
+    // }
 
     async deleteFocus(firebaseId: string, focusId: string) {
         const user = await this.getUserByFirebaseId(firebaseId);

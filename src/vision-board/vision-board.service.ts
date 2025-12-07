@@ -454,6 +454,114 @@ export class VisionBoardService extends BaseService {
 
         return this.Results({ message: 'Vision removed successfully' });
     }
+    
+    async uploadVisionSound(firebaseId: string, soundFiles: Express.Multer.File[]) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        if (!soundFiles || soundFiles.length === 0) {
+            return this.HandleError(new BadRequestException('At least one audio file is required'));
+        }
+
+        // Get the current max order for this user's sound files
+        const maxOrderFile = await this.prisma.visionBoardSound.findFirst({
+            orderBy: { order: 'desc' },
+        });
+
+        let currentOrder = maxOrderFile ? (maxOrderFile.order || 0) : 0;
+
+        const uploadedFiles: Array<{
+            id: string;
+            soundUrl: string;
+            fileName: string | null;
+            fileSize: number | null;
+            mimeType: string | null;
+            order: number | null;
+            createdAt: Date;
+            updatedAt: Date;
+        }> = [];
+
+        // Upload each file and save to database
+        for (const soundFile of soundFiles) {
+            try {
+                // Upload file to storage
+                const uploadResult = await this.storageService.uploadFile(
+                    soundFile,
+                    FileType.AUDIO,
+                    user.id,
+                    'vision-board/sounds',
+                );
+
+                currentOrder += 1;
+
+                // Save file record to database
+                const soundFileRecord = await this.prisma.visionBoardSound.create({
+                    data: {
+                        soundUrl: uploadResult.url,
+                        fileName: soundFile.originalname,
+                        fileSize: soundFile.size,
+                        mimeType: soundFile.mimetype,
+                        order: currentOrder,
+                    },
+                });
+
+                uploadedFiles.push({
+                    id: soundFileRecord.id,
+                    soundUrl: soundFileRecord.soundUrl,
+                    fileName: soundFileRecord.fileName,
+                    fileSize: soundFileRecord.fileSize,
+                    mimeType: soundFileRecord.mimeType,
+                    order: soundFileRecord.order,
+                    createdAt: soundFileRecord.createdAt,
+                    updatedAt: soundFileRecord.updatedAt,
+                });
+            } catch (error) {
+                this.logger.error(`Failed to upload sound file ${soundFile.originalname}: ${error.message}`);
+                // Continue with other files even if one fails
+                // You might want to handle this differently based on requirements
+            }
+        }
+
+        if (uploadedFiles.length === 0) {
+            return this.HandleError(
+                new BadRequestException('Failed to upload any audio files'),
+            );
+        }
+
+        return this.Results({
+            uploaded: uploadedFiles.length,
+            files: uploadedFiles,
+        });
+    }
+
+    async getVisionSounds(firebaseId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const soundFiles = await this.prisma.visionBoardSound.findMany({
+            orderBy: { order: 'asc' },
+        });
+
+        const files = soundFiles.map((file) => ({
+            id: file.id,
+            soundUrl: file.soundUrl,
+            fileName: file.fileName,
+            fileSize: file.fileSize,
+            mimeType: file.mimeType,
+            order: file.order,
+            createdAt: file.createdAt,
+            updatedAt: file.updatedAt,
+        }));
+
+        return this.Results({
+            count: files.length,
+            files,
+        });
+    }
 
     private async getUserByFirebaseId(firebaseId: string) {
         return this.prisma.user.findUnique({
@@ -461,4 +569,3 @@ export class VisionBoardService extends BaseService {
         });
     }
 }
-

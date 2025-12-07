@@ -168,5 +168,4 @@ export class UserService extends BaseService {
 
     return this.Results(user);
   }
-
 }

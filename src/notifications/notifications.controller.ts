@@ -5,6 +5,9 @@ import {
   Body,
   UseGuards,
   Get,
+  Patch,
+  Param,
+  Query,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import {
@@ -14,7 +17,7 @@ import {
   SendBulkNotificationDto,
 } from './dto';
 import { BaseController, FirebaseUser } from 'src/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { auth } from 'firebase-admin';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 
@@ -72,6 +75,78 @@ export class NotificationsController extends BaseController {
 
     return this.response({
       message: 'Tokens retrieved',
+      data: result.data,
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get user notifications with pagination' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'perPage', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @UseGuards(FirebaseGuard)
+  async getNotifications(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @Query('page') page?: string,
+    @Query('perPage') perPage?: string,
+  ) {
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    const perPageNumber = perPage ? parseInt(perPage, 10) : 10;
+
+    const result = await this.notificationsService.getUserNotifications(
+      user.uid,
+      pageNumber,
+      perPageNumber,
+    );
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Notifications retrieved',
+      data: result.data,
+    });
+  }
+
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Get unread notification count for current user' })
+  @UseGuards(FirebaseGuard)
+  async getUnreadCount(@FirebaseUser() user: auth.DecodedIdToken) {
+    const result = await this.notificationsService.countUnreadNotifications(user.uid);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Unread count retrieved',
+      data: result.data,
+    });
+  }
+
+  @Patch(':notificationId/read')
+  @ApiOperation({ summary: 'Mark a notification as read' })
+  @ApiParam({ name: 'notificationId', description: 'Notification ID' })
+  @UseGuards(FirebaseGuard)
+  async markNotificationAsRead(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @Param('notificationId') notificationId: string,
+  ) {
+    const result = await this.notificationsService.markNotificationAsRead(
+      user.uid,
+      notificationId,
+    );
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Notification marked as read',
+      data: result.data,
+    });
+  }
+
+  @Patch('read-all')
+  @ApiOperation({ summary: 'Mark all notifications as read for current user' })
+  @UseGuards(FirebaseGuard)
+  async markAllNotificationsAsRead(@FirebaseUser() user: auth.DecodedIdToken) {
+    const result = await this.notificationsService.markAllNotificationsAsRead(user.uid);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'All notifications marked as read',
       data: result.data,
     });
   }

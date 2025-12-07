@@ -112,19 +112,6 @@ model NotificationDeadLetterQueue {
   @@index([notificationId])
 }
 
-enum NotificationChannelType {
-  EMAIL
-  SMS
-  PUSH
-  IN_APP
-}
-
-enum NotificationStatus {
-  QUEUED
-  SENT
-  FAILED
-}
-
 model PasswordResetOtp {
   id         String    @id @default(uuid())
   email      String
@@ -267,14 +254,6 @@ model VisionBoardItem {
   @@index([visionBoardId, order])
 }
 
-enum ReflectionSessionStatus {
-  PENDING
-  BELIEF_CAPTURED
-  AFFIRMATION_GENERATED
-  APPROVED
-  COMPLETED
-}
-
 model Journal {
   id        String   @id @default(uuid())
   userId    String
@@ -289,4 +268,36 @@ model Journal {
   @@index([userId])
   @@index([userId, createdAt])
   @@index([userId, date])
+}
+
+model VisionBoardSound {
+  id        String   @id @default(uuid())
+  soundUrl  String
+  fileName  String?
+  fileSize  Int?
+  mimeType  String?
+  order     Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum NotificationChannelType {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum ReflectionSessionStatus {
+  PENDING
+  BELIEF_CAPTURED
+  AFFIRMATION_GENERATED
+  APPROVED
+  COMPLETED
 }

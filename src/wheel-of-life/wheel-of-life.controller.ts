@@ -621,63 +621,63 @@ export class WheelOfLifeController extends BaseController {
         });
     }
 
-    @Patch('focuses/:focusId')
-    @ApiOperation({
-        summary: 'Complete a focus',
-        description: 'Marks a focus as completed by setting isActive to false and recording the completion date.',
-    })
-    @ApiParam({
-        name: 'focusId',
-        description: 'The unique identifier of the focus to complete',
-        example: 'focus-id-123',
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Focus completed successfully',
-        schema: {
-            example: {
-                message: 'Focus updated',
-                data: {
-                    id: 'focus-id-123',
-                    wheelId: 'wheel-id-456',
-                    categoryId: 'cat-id-6',
-                    category: {
-                        id: 'cat-id-6',
-                        name: 'Leisure & Fun',
-                        order: 5,
-                    },
-                    isActive: false,
-                    startedAt: '2024-01-20T16:30:00.000Z',
-                    completedAt: '2024-01-25T10:00:00.000Z',
-                    createdAt: '2024-01-20T16:30:00.000Z',
-                    updatedAt: '2024-01-25T10:00:00.000Z',
-                },
-            },
-        },
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Focus not found',
-        schema: {
-            example: {
-                statusCode: 404,
-                message: 'Focus not found',
-                error: 'Not Found',
-            },
-        },
-    })
-    async completeFocus(
-        @FirebaseUser() user: auth.DecodedIdToken,
-        @Param('focusId') focusId: string,
-    ) {
-        const result = await this.wheelService.completeFocus(user.uid, focusId);
-        if (result.isError) throw result.error;
+    // @Patch('focuses/:focusId')
+    // @ApiOperation({
+    //     summary: 'Complete a focus',
+    //     description: 'Marks a focus as completed by setting isActive to false and recording the completion date.',
+    // })
+    // @ApiParam({
+    //     name: 'focusId',
+    //     description: 'The unique identifier of the focus to complete',
+    //     example: 'focus-id-123',
+    // })
+    // @ApiResponse({
+    //     status: 200,
+    //     description: 'Focus completed successfully',
+    //     schema: {
+    //         example: {
+    //             message: 'Focus updated',
+    //             data: {
+    //                 id: 'focus-id-123',
+    //                 wheelId: 'wheel-id-456',
+    //                 categoryId: 'cat-id-6',
+    //                 category: {
+    //                     id: 'cat-id-6',
+    //                     name: 'Leisure & Fun',
+    //                     order: 5,
+    //                 },
+    //                 isActive: false,
+    //                 startedAt: '2024-01-20T16:30:00.000Z',
+    //                 completedAt: '2024-01-25T10:00:00.000Z',
+    //                 createdAt: '2024-01-20T16:30:00.000Z',
+    //                 updatedAt: '2024-01-25T10:00:00.000Z',
+    //             },
+    //         },
+    //     },
+    // })
+    // @ApiResponse({
+    //     status: 404,
+    //     description: 'Focus not found',
+    //     schema: {
+    //         example: {
+    //             statusCode: 404,
+    //             message: 'Focus not found',
+    //             error: 'Not Found',
+    //         },
+    //     },
+    // })
+    // async completeFocus(
+    //     @FirebaseUser() user: auth.DecodedIdToken,
+    //     @Param('focusId') focusId: string,
+    // ) {
+    //     const result = await this.wheelService.completeFocus(user.uid, focusId);
+    //     if (result.isError) throw result.error;
 
-        return this.response({
-            message: 'Focus updated',
-            data: result.data,
-        });
-    }
+    //     return this.response({
+    //         message: 'Focus updated',
+    //         data: result.data,
+    //     });
+    // }
 
     @Delete('focuses/:focusId')
     @ApiOperation({

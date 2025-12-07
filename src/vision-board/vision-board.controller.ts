@@ -9,6 +9,7 @@ import {
     UseGuards,
     UseInterceptors,
     UploadedFile,
+    UploadedFiles,
     BadRequestException,
 } from '@nestjs/common';
 import {
@@ -21,7 +22,7 @@ import {
     ApiConsumes,
     ApiTags,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
@@ -353,6 +354,125 @@ export class VisionBoardController extends BaseController {
 
         return this.response({
             message: 'Vision removed successfully',
+            data: result.data,
+        });
+    }
+
+    @Post('sounds')
+    @UseInterceptors(FilesInterceptor('sounds', 10))
+    @ApiConsumes('multipart/form-data')
+    @ApiOperation({
+        summary: 'Upload multiple audio files for vision board',
+        description: 'Uploads one or more audio files to be used with the vision board. Supports multiple file uploads (max 10 files per request).',
+    })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                sounds: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                        format: 'binary',
+                    },
+                    description: 'Audio files to upload (max 10 files). Supported formats: MP3, WAV, OGG, AAC, M4A, WebM',
+                },
+            },
+            required: ['sounds'],
+        },
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Audio files uploaded successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                uploaded: { type: 'number', description: 'Number of files successfully uploaded' },
+                files: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            soundUrl: { type: 'string' },
+                            fileName: { type: 'string', nullable: true },
+                            fileSize: { type: 'number', nullable: true },
+                            mimeType: { type: 'string', nullable: true },
+                            order: { type: 'number', nullable: true },
+                            createdAt: { type: 'string', format: 'date-time' },
+                            updatedAt: { type: 'string', format: 'date-time' },
+                        },
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Invalid request or failed to upload audio files',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User not found',
+    })
+    async uploadVisionSound(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @UploadedFiles() soundFiles?: Express.Multer.File[],
+    ) {
+        if (!soundFiles || soundFiles.length === 0) {
+            throw new BadRequestException('At least one audio file is required');
+        }
+
+        const result = await this.visionBoardService.uploadVisionSound(user.uid, soundFiles);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Audio files uploaded successfully',
+            data: result.data,
+        });
+    }
+
+    @Get('sounds')
+    @ApiOperation({
+        summary: 'Get all audio files for vision board',
+        description: 'Retrieves all audio files that have been uploaded for the vision board, ordered by their display order.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Audio files retrieved successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                count: { type: 'number', description: 'Total number of audio files' },
+                files: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            soundUrl: { type: 'string' },
+                            fileName: { type: 'string', nullable: true },
+                            fileSize: { type: 'number', nullable: true },
+                            mimeType: { type: 'string', nullable: true },
+                            order: { type: 'number', nullable: true },
+                            createdAt: { type: 'string', format: 'date-time' },
+                            updatedAt: { type: 'string', format: 'date-time' },
+                        },
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User not found',
+    })
+    async getVisionSounds(@FirebaseUser() user: auth.DecodedIdToken) {
+        const result = await this.visionBoardService.getVisionSounds(user.uid);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Audio files retrieved successfully',
             data: result.data,
         });
     }

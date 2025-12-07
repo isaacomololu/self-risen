@@ -6,6 +6,9 @@ import { TranscriptionService } from './services/transcription.service';
 import { NlpTransformationService } from './services/nlp-transformation.service';
 import { TextToSpeechService } from './services/text-to-speech.service';
 import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto } from './dto';
+import { INotificationService } from 'src/notifications/interfaces/notification.interface';
+import { NotificationTypeEnum, NotificationChannelTypeEnum } from 'src/notifications/enums/notification.enum';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class ReflectionService extends BaseService {
@@ -38,6 +41,7 @@ export class ReflectionService extends BaseService {
         private transcriptionService: TranscriptionService,
         private nlpTransformationService: NlpTransformationService,
         private textToSpeechService: TextToSpeechService,
+        private notificationService: INotificationService,
     ) {
         super();
     }
@@ -365,6 +369,29 @@ export class ReflectionService extends BaseService {
                 affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
             };
 
+            // Send push notification for affirmation generated
+            try {
+                const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
+                await this.notificationService.notifyUser({
+                    userId: user.id,
+                    type: NotificationTypeEnum.AFFIRMATION_GENERATED,
+                    requestId,
+                    channels: [
+                        { type: NotificationChannelTypeEnum.PUSH },
+                        { type: NotificationChannelTypeEnum.IN_APP },
+                    ],
+                    metadata: {
+                        title: 'Affirmation Generated!',
+                        body: `Your affirmation for ${updatedSession.category.name} is ready!`,
+                        sessionId: sessionId,
+                        affirmation: transformation.generatedAffirmation,
+                        categoryName: updatedSession.category.name,
+                    },
+                });
+            } catch (notificationError) {
+                this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
+            }
+
             return this.Results(sessionWithAudio);
         } catch (error) {
             // Log error but don't fail the request - transformation service handles fallbacks
@@ -400,6 +427,29 @@ export class ReflectionService extends BaseService {
                     ...updatedSession,
                     affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
                 };
+
+                // Send push notification for affirmation generated
+                try {
+                    const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
+                    await this.notificationService.notifyUser({
+                        userId: user.id,
+                        type: NotificationTypeEnum.AFFIRMATION_GENERATED,
+                        requestId,
+                        channels: [
+                            { type: NotificationChannelTypeEnum.PUSH },
+                            { type: NotificationChannelTypeEnum.IN_APP },
+                        ],
+                        metadata: {
+                            title: 'Affirmation Generated!',
+                            body: `Your affirmation for ${updatedSession.category.name} is ready!`,
+                            sessionId: sessionId,
+                            affirmation: transformation.generatedAffirmation,
+                            categoryName: updatedSession.category.name,
+                        },
+                    });
+                } catch (notificationError) {
+                    this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
+                }
 
                 return this.Results(sessionWithAudio);
             } catch (fallbackError) {

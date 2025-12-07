@@ -2,12 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { BaseService } from 'src/common';
+import { INotificationService } from 'src/notifications/interfaces/notification.interface';
+import { NotificationTypeEnum, NotificationChannelTypeEnum } from 'src/notifications/enums/notification.enum';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class SessionExpirationService extends BaseService {
     private readonly logger = new Logger(SessionExpirationService.name);
 
-    constructor(private prisma: DatabaseProvider) {
+    constructor(
+        private prisma: DatabaseProvider,
+        private notificationService: INotificationService,
+    ) {
         super();
     }
 
@@ -72,12 +78,36 @@ export class SessionExpirationService extends BaseService {
     }
 
     private async updateUserSessions(userId: string) {
-        await this.prisma.user.update({
+        const updatedUser = await this.prisma.user.update({
             where: { id: userId },
             data: {
                 sessions: { increment: 1 },
             },
+            select: {
+                sessions: true,
+            },
         });
+
+        // Send push notification for session completion
+        try {
+            const requestId = `session-completed-${userId}-${Date.now()}-${randomUUID()}`;
+            await this.notificationService.notifyUser({
+                userId: userId,
+                type: NotificationTypeEnum.SESSION_COMPLETED,
+                requestId,
+                channels: [
+                    { type: NotificationChannelTypeEnum.PUSH },
+                    { type: NotificationChannelTypeEnum.IN_APP },
+                ],
+                metadata: {
+                    title: 'Session Completed!',
+                    body: `Great work! You've completed ${updatedUser.sessions} reflection session${updatedUser.sessions === 1 ? '' : 's'}!`,
+                    totalSessions: updatedUser.sessions,
+                },
+            });
+        } catch (notificationError) {
+            this.logger.warn(`Failed to send session completion notification: ${notificationError.message}`);
+        }
     }
 }
 

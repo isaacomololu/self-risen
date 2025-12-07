@@ -550,38 +550,99 @@ export class NotificationsService
     return results;
   }
 
-  async getUserNotifications(userId: string, page = 1, perPage = 10) {
-    const recipients = await this.prisma.notificationRecipient.findMany({
-      where: { recipientId: userId },
-      include: { notification: true },
-      orderBy: { createdAt: 'desc' },
-      take: perPage,
-      skip: (page - 1) * perPage,
+  async getUserNotifications(firebaseId: string, page = 1, perPage = 10) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId },
+      select: { id: true },
     });
 
-    return recipients;
+    if (!user) {
+      return this.HandleError(new NotFoundException('User not found'));
+    }
+
+    const pageNumber = Math.max(1, Math.floor(page));
+    const perPageNumber = Math.max(1, Math.min(100, Math.floor(perPage)));
+    const skip = (pageNumber - 1) * perPageNumber;
+
+    const [recipients, totalCount] = await Promise.all([
+      this.prisma.notificationRecipient.findMany({
+        where: { recipientId: user.id },
+        include: { notification: true },
+        orderBy: { createdAt: 'desc' },
+        take: perPageNumber,
+        skip,
+      }),
+      this.prisma.notificationRecipient.count({
+        where: { recipientId: user.id },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / perPageNumber);
+
+    return this.Results({
+      data: recipients,
+      pagination: {
+        page: pageNumber,
+        limit: perPageNumber,
+        total: totalCount,
+        totalPages,
+        hasNextPage: pageNumber < totalPages,
+        hasPreviousPage: pageNumber > 1,
+      },
+    });
   }
 
-  async markNotificationAsRead(userId: string, notificationId: string) {
+  async markNotificationAsRead(firebaseId: string, notificationId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return this.HandleError(new NotFoundException('User not found'));
+    }
+
     await this.prisma.notificationRecipient.updateMany({
-      where: { recipientId: userId, notificationId },
+      where: { recipientId: user.id, notificationId },
       data: { isRead: true },
     });
-    return { success: true };
+
+    return this.Results({ success: true });
   }
 
-  async markAllNotificationsAsRead(userId: string) {
+  async markAllNotificationsAsRead(firebaseId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return this.HandleError(new NotFoundException('User not found'));
+    }
+
     await this.prisma.notificationRecipient.updateMany({
-      where: { recipientId: userId },
+      where: { recipientId: user.id },
       data: { isRead: true },
     });
-    return { success: true };
+
+    return this.Results({ success: true });
   }
 
-  async countUnreadNotifications(userId: string): Promise<number> {
-    return this.prisma.notificationRecipient.count({
-      where: { recipientId: userId, isRead: false },
+  async countUnreadNotifications(firebaseId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId },
+      select: { id: true },
     });
+
+    if (!user) {
+      return this.HandleError(new NotFoundException('User not found'));
+    }
+
+    const count = await this.prisma.notificationRecipient.count({
+      where: { recipientId: user.id, isRead: false },
+    });
+
+    return this.Results({ count });
   }
 
   private getDefaultChannels(type: NotificationTypeEnum): NotificationChannel[] {
