@@ -11,6 +11,7 @@ import { WheelOfLifeModule } from './wheel-of-life/wheel-of-life.module';
 import { StorageModule } from './common/storage/storage.module';
 import { ReflectionModule } from './reflection/reflection.module';
 import { VisionBoardModule } from './vision-board/vision-board.module';
+import { JournalModule } from './journal/journal.module';
 import { FirebaseAdminModule } from '@alpha018/nestjs-firebase-auth';
 import { ExtractJwt } from 'passport-jwt';
 import * as admin from 'firebase-admin';
@@ -187,6 +188,7 @@ import { CommonModule } from './common/common.module';
     StorageModule,
     ReflectionModule,
     VisionBoardModule,
+    JournalModule,
     // JwtModule.registerAsync({
     //   useFactory: () => ({
     //     secret: config.JWT_SECRET,

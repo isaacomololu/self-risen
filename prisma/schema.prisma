@@ -32,6 +32,7 @@ model User {
   wheelOfLife        WheelOfLife?
   reflectionSessions ReflectionSession[]
   visionBoard        VisionBoard?
+  journals           Journal[]
 }
 
 model Notification {
@@ -272,4 +273,20 @@ enum ReflectionSessionStatus {
   AFFIRMATION_GENERATED
   APPROVED
   COMPLETED
+}
+
+model Journal {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @default(now())
+  title     String
+  text      String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, date])
 }
