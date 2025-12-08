@@ -8,7 +8,10 @@ import {
   RefreshTokenDto,
   ForgotPasswordDto,
   ChangePasswordDto,
-  VerifyPasswordResetOtpDto
+  VerifyPasswordResetOtpDto,
+  GoogleSignInDto,
+  AppleSignInDto,
+  FacebookSignInDto
 } from './dto';
 import { BaseController, AuthGuard, FirebaseUser } from 'src/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -136,6 +139,42 @@ export class AuthController extends BaseController {
 
     return this.response({
       message: 'Password reset successfully',
+      data: result.data,
+    });
+  }
+
+  @Post('signin/google')
+  @ApiOperation({ summary: 'Sign in with Google using Firebase ID token (obtained after Google sign-in through Firebase SDK)' })
+  async signInWithGoogle(@Body() form: GoogleSignInDto) {
+    const result = await this.authService.signInWithGoogle(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Google sign-in successful',
+      data: result.data,
+    });
+  }
+
+  @Post('signin/apple')
+  @ApiOperation({ summary: 'Sign in with Apple using Firebase ID token (obtained after Apple sign-in through Firebase SDK)' })
+  async signInWithApple(@Body() form: AppleSignInDto) {
+    const result = await this.authService.signInWithApple(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Apple sign-in successful',
+      data: result.data,
+    });
+  }
+
+  @Post('signin/facebook')
+  @ApiOperation({ summary: 'Sign in with Facebook using Facebook access token' })
+  async signInWithFacebook(@Body() form: FacebookSignInDto) {
+    const result = await this.authService.signInWithFacebook(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Facebook sign-in successful',
       data: result.data,
     });
   }

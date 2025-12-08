@@ -14,7 +14,10 @@ import {
   ForgotPasswordDto,
   ChangePasswordDto,
   ResetPasswordDto,
-  VerifyPasswordResetOtpDto
+  VerifyPasswordResetOtpDto,
+  GoogleSignInDto,
+  AppleSignInDto,
+  FacebookSignInDto
 } from './dto';
 import { auth } from 'firebase-admin';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
@@ -741,6 +744,357 @@ export class AuthService extends BaseService {
       logger.error(`Reset password error: ${error.message || error}`);
       return this.HandleError(
         new UnauthorizedException('Failed to reset password. Please try again.')
+      );
+    }
+  }
+
+  /**
+   * Sign in with Google using Firebase ID token
+   * Client should use Firebase SDK to sign in with Google, then send the resulting Firebase ID token
+   * @param payload - Google sign-in DTO containing Firebase ID token
+   * @returns Access token and refresh token
+   */
+  async signInWithGoogle(payload: GoogleSignInDto) {
+    const { idToken } = payload;
+
+    try {
+      // Verify the Firebase ID token (obtained after Google sign-in through Firebase SDK)
+      let verifiedUser: auth.DecodedIdToken;
+      try {
+        verifiedUser = await auth().verifyIdToken(idToken, true);
+      } catch (error) {
+        logger.error(`Failed to verify Google ID token: ${error.message || error}`);
+        return this.HandleError(
+          new UnauthorizedException('Invalid Google ID token. Please try again.')
+        );
+      }
+
+      // Check if user exists in database
+      let user = await this.prisma.user.findUnique({
+        where: { firebaseId: verifiedUser.uid }
+      });
+
+      // If user doesn't exist, create them
+      if (!user) {
+        // Get Firebase user record for additional info
+        let firebaseUser: auth.UserRecord;
+        try {
+          firebaseUser = await auth().getUser(verifiedUser.uid);
+        } catch (error) {
+          logger.error(`Failed to get Firebase user: ${error.message || error}`);
+          return this.HandleError(
+            new UnauthorizedException('Failed to retrieve user information')
+          );
+        }
+
+        // Create user in database
+        try {
+          user = await this.prisma.user.create({
+            data: {
+              firebaseId: verifiedUser.uid,
+              email: firebaseUser.email || verifiedUser.email || '',
+              name: firebaseUser.displayName || verifiedUser.name || 'User',
+              avatar: firebaseUser.photoURL || verifiedUser.picture || null,
+              lastLoggedInAt: new Date()
+            }
+          });
+        } catch (error) {
+          if (error.code === 'P2002') {
+            // Unique constraint violation - user might have been created between checks
+            user = await this.prisma.user.findUnique({
+              where: { firebaseId: verifiedUser.uid }
+            });
+            if (!user) {
+              return this.HandleError(
+                new ConflictException('Failed to create user account')
+              );
+            }
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        // Update last logged in time
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoggedInAt: new Date()
+          }
+        });
+      }
+
+      // Generate new Firebase tokens
+      const customToken = await auth().createCustomToken(verifiedUser.uid);
+      
+      // Exchange custom token for ID token and refresh token
+      const firebaseWebApiKey = config.FIREBASE_API_KEY;
+      const tokenResponse = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseWebApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token: customToken,
+            returnSecureToken: true,
+          }),
+        }
+      );
+
+      const tokenData = await tokenResponse.json();
+
+      if (!tokenResponse.ok) {
+        logger.error(`Failed to exchange custom token: ${JSON.stringify(tokenData)}`);
+        return this.HandleError(
+          new UnauthorizedException('Failed to generate authentication tokens')
+        );
+      }
+
+      return this.Results({
+        accessToken: tokenData.idToken,
+        refreshToken: tokenData.refreshToken,
+      });
+    } catch (error) {
+      logger.error(`Google sign-in error: ${error.message || error}`);
+      return this.HandleError(
+        new UnauthorizedException('Google sign-in failed. Please try again.')
+      );
+    }
+  }
+
+  /**
+   * Sign in with Apple using Firebase ID token
+   * Client should use Firebase SDK to sign in with Apple, then send the resulting Firebase ID token
+   * @param payload - Apple sign-in DTO containing Firebase ID token
+   * @returns Access token and refresh token
+   */
+  async signInWithApple(payload: AppleSignInDto) {
+    const { idToken } = payload;
+
+    try {
+      // Verify the Firebase ID token (obtained after Apple sign-in through Firebase SDK)
+      let verifiedUser: auth.DecodedIdToken;
+      try {
+        verifiedUser = await auth().verifyIdToken(idToken, true);
+      } catch (error) {
+        logger.error(`Failed to verify Apple ID token: ${error.message || error}`);
+        return this.HandleError(
+          new UnauthorizedException('Invalid Apple ID token. Please try again.')
+        );
+      }
+
+      // Check if user exists in database
+      let user = await this.prisma.user.findUnique({
+        where: { firebaseId: verifiedUser.uid }
+      });
+
+      // If user doesn't exist, create them
+      if (!user) {
+        // Get Firebase user record for additional info
+        let firebaseUser: auth.UserRecord;
+        try {
+          firebaseUser = await auth().getUser(verifiedUser.uid);
+        } catch (error) {
+          logger.error(`Failed to get Firebase user: ${error.message || error}`);
+          return this.HandleError(
+            new UnauthorizedException('Failed to retrieve user information')
+          );
+        }
+
+        // Create user in database
+        try {
+          user = await this.prisma.user.create({
+            data: {
+              firebaseId: verifiedUser.uid,
+              email: firebaseUser.email || verifiedUser.email || '',
+              name: firebaseUser.displayName || verifiedUser.name || 'User',
+              avatar: firebaseUser.photoURL || verifiedUser.picture || null,
+              lastLoggedInAt: new Date()
+            }
+          });
+        } catch (error) {
+          if (error.code === 'P2002') {
+            // Unique constraint violation - user might have been created between checks
+            user = await this.prisma.user.findUnique({
+              where: { firebaseId: verifiedUser.uid }
+            });
+            if (!user) {
+              return this.HandleError(
+                new ConflictException('Failed to create user account')
+              );
+            }
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        // Update last logged in time
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoggedInAt: new Date()
+          }
+        });
+      }
+
+      // Generate new Firebase tokens
+      const customToken = await auth().createCustomToken(verifiedUser.uid);
+      
+      // Exchange custom token for ID token and refresh token
+      const firebaseWebApiKey = config.FIREBASE_API_KEY;
+      const tokenResponse = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseWebApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token: customToken,
+            returnSecureToken: true,
+          }),
+        }
+      );
+
+      const tokenData = await tokenResponse.json();
+
+      if (!tokenResponse.ok) {
+        logger.error(`Failed to exchange custom token: ${JSON.stringify(tokenData)}`);
+        return this.HandleError(
+          new UnauthorizedException('Failed to generate authentication tokens')
+        );
+      }
+
+      return this.Results({
+        accessToken: tokenData.idToken,
+        refreshToken: tokenData.refreshToken,
+      });
+    } catch (error) {
+      logger.error(`Apple sign-in error: ${error.message || error}`);
+      return this.HandleError(
+        new UnauthorizedException('Apple sign-in failed. Please try again.')
+      );
+    }
+  }
+
+  /**
+   * Sign in with Facebook using Facebook access token
+   * @param payload - Facebook sign-in DTO containing access token
+   * @returns Access token and refresh token
+   */
+  async signInWithFacebook(payload: FacebookSignInDto) {
+    const { accessToken } = payload;
+
+    try {
+      const firebaseWebApiKey = config.FIREBASE_API_KEY;
+
+      // Exchange Facebook access token for Firebase ID token
+      const response = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${firebaseWebApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            postBody: `access_token=${accessToken}&providerId=facebook.com`,
+            requestUri: 'http://localhost',
+            returnIdpCredential: true,
+            returnSecureToken: true,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        logger.error(`Facebook authentication failed: ${JSON.stringify(data)}`);
+
+        if (data.error?.message === 'INVALID_IDP_RESPONSE' || data.error?.message === 'INVALID_CREDENTIAL') {
+          return this.HandleError(
+            new UnauthorizedException('Invalid Facebook access token')
+          );
+        }
+
+        return this.HandleError(
+          new UnauthorizedException(data.error?.message || 'Facebook authentication failed')
+        );
+      }
+
+      // Verify the ID token using Admin SDK
+      let verifiedUser: auth.DecodedIdToken;
+      try {
+        verifiedUser = await auth().verifyIdToken(data.idToken, true);
+      } catch (error) {
+        logger.error(`Failed to verify Facebook ID token: ${error.message || error}`);
+        return this.HandleError(
+          new UnauthorizedException('Failed to verify authentication token')
+        );
+      }
+
+      // Check if user exists in database
+      let user = await this.prisma.user.findUnique({
+        where: { firebaseId: verifiedUser.uid }
+      });
+
+      // If user doesn't exist, create them
+      if (!user) {
+        // Get Firebase user record for additional info
+        let firebaseUser: auth.UserRecord;
+        try {
+          firebaseUser = await auth().getUser(verifiedUser.uid);
+        } catch (error) {
+          logger.error(`Failed to get Firebase user: ${error.message || error}`);
+          return this.HandleError(
+            new UnauthorizedException('Failed to retrieve user information')
+          );
+        }
+
+        // Create user in database
+        try {
+          user = await this.prisma.user.create({
+            data: {
+              firebaseId: verifiedUser.uid,
+              email: firebaseUser.email || verifiedUser.email || '',
+              name: firebaseUser.displayName || verifiedUser.name || 'User',
+              avatar: firebaseUser.photoURL || verifiedUser.picture || null,
+              lastLoggedInAt: new Date()
+            }
+          });
+        } catch (error) {
+          if (error.code === 'P2002') {
+            // Unique constraint violation - user might have been created between checks
+            user = await this.prisma.user.findUnique({
+              where: { firebaseId: verifiedUser.uid }
+            });
+            if (!user) {
+              return this.HandleError(
+                new ConflictException('Failed to create user account')
+              );
+            }
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        // Update last logged in time
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoggedInAt: new Date()
+          }
+        });
+      }
+
+      return this.Results({
+        accessToken: data.idToken,
+        refreshToken: data.refreshToken,
+      });
+    } catch (error) {
+      logger.error(`Facebook sign-in error: ${error.message || error}`);
+      return this.HandleError(
+        new UnauthorizedException('Facebook sign-in failed. Please try again.')
       );
     }
   }
