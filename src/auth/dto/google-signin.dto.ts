@@ -4,7 +4,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class GoogleSignInDto {
   @ApiProperty({ 
     required: true, 
-    description: 'Firebase ID token obtained after signing in with Google through Firebase SDK' 
+    description: 'Google ID token obtained from Google Sign-In' 
   })
   @IsNotEmpty()
   @IsString()

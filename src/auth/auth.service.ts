@@ -16,7 +16,6 @@ import {
   ResetPasswordDto,
   VerifyPasswordResetOtpDto,
   GoogleSignInDto,
-  AppleSignInDto,
   FacebookSignInDto
 } from './dto';
 import { auth } from 'firebase-admin';
@@ -749,52 +748,81 @@ export class AuthService extends BaseService {
   }
 
   /**
-   * Sign in with Google using Firebase ID token
-   * Client should use Firebase SDK to sign in with Google, then send the resulting Firebase ID token
-   * @param payload - Google sign-in DTO containing Firebase ID token
+   * Sign in with Google using Google ID token directly
+   * Verifies Google ID token with Google's OAuth2 API
+   * @param payload - Google sign-in DTO containing Google ID token
    * @returns Access token and refresh token
    */
   async signInWithGoogle(payload: GoogleSignInDto) {
     const { idToken } = payload;
 
     try {
-      // Verify the Firebase ID token (obtained after Google sign-in through Firebase SDK)
-      let verifiedUser: auth.DecodedIdToken;
-      try {
-        verifiedUser = await auth().verifyIdToken(idToken, true);
-      } catch (error) {
-        logger.error(`Failed to verify Google ID token: ${error.message || error}`);
+      // Verify Google ID token with Google's tokeninfo endpoint
+      const tokenInfoResponse = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
+      );
+
+      if (!tokenInfoResponse.ok) {
+        logger.error(`Google token verification failed: ${tokenInfoResponse.statusText}`);
         return this.HandleError(
-          new UnauthorizedException('Invalid Google ID token. Please try again.')
+          new UnauthorizedException('Invalid Google ID token')
         );
       }
 
-      // Check if user exists in database
+      const tokenInfo = await tokenInfoResponse.json();
+
+      // Validate token info
+      if (!tokenInfo.email || !tokenInfo.sub) {
+        logger.error(`Invalid Google token info: ${JSON.stringify(tokenInfo)}`);
+        return this.HandleError(
+          new UnauthorizedException('Invalid Google token information')
+        );
+      }
+
+      // Extract user information from Google token
+      const googleUserId = tokenInfo.sub; // Google user ID
+      const email = tokenInfo.email;
+      const name = tokenInfo.name || email.split('@')[0];
+      const picture = tokenInfo.picture || null;
+
+      // Check if user exists in database by email (since we don't have Firebase UID yet)
       let user = await this.prisma.user.findUnique({
-        where: { firebaseId: verifiedUser.uid }
+        where: { email }
       });
 
-      // If user doesn't exist, create them
+      let firebaseUid: string;
+
       if (!user) {
-        // Get Firebase user record for additional info
-        let firebaseUser: auth.UserRecord;
+        // User doesn't exist - create Firebase user first
         try {
-          firebaseUser = await auth().getUser(verifiedUser.uid);
+          const firebaseUser = await auth().createUser({
+            email,
+            displayName: name,
+            photoURL: picture,
+            emailVerified: tokenInfo.email_verified === 'true',
+          });
+          firebaseUid = firebaseUser.uid;
         } catch (error) {
-          logger.error(`Failed to get Firebase user: ${error.message || error}`);
-          return this.HandleError(
-            new UnauthorizedException('Failed to retrieve user information')
-          );
+          if (error.code === 'auth/email-already-exists') {
+            // Email exists in Firebase, get the user
+            const firebaseUser = await auth().getUserByEmail(email);
+            firebaseUid = firebaseUser.uid;
+          } else {
+            logger.error(`Failed to create Firebase user: ${error.message || error}`);
+            return this.HandleError(
+              new UnauthorizedException('Failed to create user account')
+            );
+          }
         }
 
         // Create user in database
         try {
           user = await this.prisma.user.create({
             data: {
-              firebaseId: verifiedUser.uid,
-              email: firebaseUser.email || verifiedUser.email || '',
-              name: firebaseUser.displayName || verifiedUser.name || 'User',
-              avatar: firebaseUser.photoURL || verifiedUser.picture || null,
+              firebaseId: firebaseUid,
+              email,
+              name,
+              avatar: picture,
               lastLoggedInAt: new Date()
             }
           });
@@ -802,19 +830,21 @@ export class AuthService extends BaseService {
           if (error.code === 'P2002') {
             // Unique constraint violation - user might have been created between checks
             user = await this.prisma.user.findUnique({
-              where: { firebaseId: verifiedUser.uid }
+              where: { email }
             });
             if (!user) {
               return this.HandleError(
                 new ConflictException('Failed to create user account')
               );
             }
+            firebaseUid = user.firebaseId;
           } else {
             throw error;
           }
         }
       } else {
-        // Update last logged in time
+        // User exists - update last logged in time
+        firebaseUid = user.firebaseId;
         await this.prisma.user.update({
           where: { id: user.id },
           data: {
@@ -823,8 +853,8 @@ export class AuthService extends BaseService {
         });
       }
 
-      // Generate new Firebase tokens
-      const customToken = await auth().createCustomToken(verifiedUser.uid);
+      // Generate Firebase tokens for API authentication
+      const customToken = await auth().createCustomToken(firebaseUid);
       
       // Exchange custom token for ID token and refresh token
       const firebaseWebApiKey = config.FIREBASE_API_KEY;
@@ -863,53 +893,83 @@ export class AuthService extends BaseService {
     }
   }
 
+
   /**
-   * Sign in with Apple using Firebase ID token
-   * Client should use Firebase SDK to sign in with Apple, then send the resulting Firebase ID token
-   * @param payload - Apple sign-in DTO containing Firebase ID token
+   * Sign in with Facebook using Facebook access token directly
+   * Verifies Facebook access token with Facebook Graph API
+   * @param payload - Facebook sign-in DTO containing access token
    * @returns Access token and refresh token
    */
-  async signInWithApple(payload: AppleSignInDto) {
-    const { idToken } = payload;
+  async signInWithFacebook(payload: FacebookSignInDto) {
+    const { accessToken } = payload;
 
     try {
-      // Verify the Firebase ID token (obtained after Apple sign-in through Firebase SDK)
-      let verifiedUser: auth.DecodedIdToken;
-      try {
-        verifiedUser = await auth().verifyIdToken(idToken, true);
-      } catch (error) {
-        logger.error(`Failed to verify Apple ID token: ${error.message || error}`);
+      // Verify Facebook access token and get user info from Facebook Graph API
+      const graphResponse = await fetch(
+        `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`
+      );
+
+      if (!graphResponse.ok) {
+        const errorData = await graphResponse.json().catch(() => ({}));
+        logger.error(`Facebook Graph API error: ${JSON.stringify(errorData)}`);
         return this.HandleError(
-          new UnauthorizedException('Invalid Apple ID token. Please try again.')
+          new UnauthorizedException('Invalid Facebook access token')
         );
       }
 
-      // Check if user exists in database
+      const facebookUser = await graphResponse.json();
+
+      // Validate Facebook user data
+      if (!facebookUser.id || !facebookUser.email) {
+        logger.error(`Invalid Facebook user data: ${JSON.stringify(facebookUser)}`);
+        return this.HandleError(
+          new UnauthorizedException('Invalid Facebook user information. Email is required.')
+        );
+      }
+
+      const facebookUserId = facebookUser.id;
+      const email = facebookUser.email;
+      const name = facebookUser.name || email.split('@')[0];
+      const picture = facebookUser.picture?.data?.url || null;
+
+      // Check if user exists in database by email
       let user = await this.prisma.user.findUnique({
-        where: { firebaseId: verifiedUser.uid }
+        where: { email }
       });
 
-      // If user doesn't exist, create them
+      let firebaseUid: string;
+
       if (!user) {
-        // Get Firebase user record for additional info
-        let firebaseUser: auth.UserRecord;
+        // User doesn't exist - create Firebase user first
         try {
-          firebaseUser = await auth().getUser(verifiedUser.uid);
+          const firebaseUser = await auth().createUser({
+            email,
+            displayName: name,
+            photoURL: picture,
+            emailVerified: true, // Facebook emails are typically verified
+          });
+          firebaseUid = firebaseUser.uid;
         } catch (error) {
-          logger.error(`Failed to get Firebase user: ${error.message || error}`);
-          return this.HandleError(
-            new UnauthorizedException('Failed to retrieve user information')
-          );
+          if (error.code === 'auth/email-already-exists') {
+            // Email exists in Firebase, get the user
+            const firebaseUser = await auth().getUserByEmail(email);
+            firebaseUid = firebaseUser.uid;
+          } else {
+            logger.error(`Failed to create Firebase user: ${error.message || error}`);
+            return this.HandleError(
+              new UnauthorizedException('Failed to create user account')
+            );
+          }
         }
 
         // Create user in database
         try {
           user = await this.prisma.user.create({
             data: {
-              firebaseId: verifiedUser.uid,
-              email: firebaseUser.email || verifiedUser.email || '',
-              name: firebaseUser.displayName || verifiedUser.name || 'User',
-              avatar: firebaseUser.photoURL || verifiedUser.picture || null,
+              firebaseId: firebaseUid,
+              email,
+              name,
+              avatar: picture,
               lastLoggedInAt: new Date()
             }
           });
@@ -917,19 +977,21 @@ export class AuthService extends BaseService {
           if (error.code === 'P2002') {
             // Unique constraint violation - user might have been created between checks
             user = await this.prisma.user.findUnique({
-              where: { firebaseId: verifiedUser.uid }
+              where: { email }
             });
             if (!user) {
               return this.HandleError(
                 new ConflictException('Failed to create user account')
               );
             }
+            firebaseUid = user.firebaseId;
           } else {
             throw error;
           }
         }
       } else {
-        // Update last logged in time
+        // User exists - update last logged in time
+        firebaseUid = user.firebaseId;
         await this.prisma.user.update({
           where: { id: user.id },
           data: {
@@ -938,8 +1000,8 @@ export class AuthService extends BaseService {
         });
       }
 
-      // Generate new Firebase tokens
-      const customToken = await auth().createCustomToken(verifiedUser.uid);
+      // Generate Firebase tokens for API authentication
+      const customToken = await auth().createCustomToken(firebaseUid);
       
       // Exchange custom token for ID token and refresh token
       const firebaseWebApiKey = config.FIREBASE_API_KEY;
@@ -969,127 +1031,6 @@ export class AuthService extends BaseService {
       return this.Results({
         accessToken: tokenData.idToken,
         refreshToken: tokenData.refreshToken,
-      });
-    } catch (error) {
-      logger.error(`Apple sign-in error: ${error.message || error}`);
-      return this.HandleError(
-        new UnauthorizedException('Apple sign-in failed. Please try again.')
-      );
-    }
-  }
-
-  /**
-   * Sign in with Facebook using Facebook access token
-   * @param payload - Facebook sign-in DTO containing access token
-   * @returns Access token and refresh token
-   */
-  async signInWithFacebook(payload: FacebookSignInDto) {
-    const { accessToken } = payload;
-
-    try {
-      const firebaseWebApiKey = config.FIREBASE_API_KEY;
-
-      // Exchange Facebook access token for Firebase ID token
-      const response = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${firebaseWebApiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            postBody: `access_token=${accessToken}&providerId=facebook.com`,
-            requestUri: 'http://localhost',
-            returnIdpCredential: true,
-            returnSecureToken: true,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        logger.error(`Facebook authentication failed: ${JSON.stringify(data)}`);
-
-        if (data.error?.message === 'INVALID_IDP_RESPONSE' || data.error?.message === 'INVALID_CREDENTIAL') {
-          return this.HandleError(
-            new UnauthorizedException('Invalid Facebook access token')
-          );
-        }
-
-        return this.HandleError(
-          new UnauthorizedException(data.error?.message || 'Facebook authentication failed')
-        );
-      }
-
-      // Verify the ID token using Admin SDK
-      let verifiedUser: auth.DecodedIdToken;
-      try {
-        verifiedUser = await auth().verifyIdToken(data.idToken, true);
-      } catch (error) {
-        logger.error(`Failed to verify Facebook ID token: ${error.message || error}`);
-        return this.HandleError(
-          new UnauthorizedException('Failed to verify authentication token')
-        );
-      }
-
-      // Check if user exists in database
-      let user = await this.prisma.user.findUnique({
-        where: { firebaseId: verifiedUser.uid }
-      });
-
-      // If user doesn't exist, create them
-      if (!user) {
-        // Get Firebase user record for additional info
-        let firebaseUser: auth.UserRecord;
-        try {
-          firebaseUser = await auth().getUser(verifiedUser.uid);
-        } catch (error) {
-          logger.error(`Failed to get Firebase user: ${error.message || error}`);
-          return this.HandleError(
-            new UnauthorizedException('Failed to retrieve user information')
-          );
-        }
-
-        // Create user in database
-        try {
-          user = await this.prisma.user.create({
-            data: {
-              firebaseId: verifiedUser.uid,
-              email: firebaseUser.email || verifiedUser.email || '',
-              name: firebaseUser.displayName || verifiedUser.name || 'User',
-              avatar: firebaseUser.photoURL || verifiedUser.picture || null,
-              lastLoggedInAt: new Date()
-            }
-          });
-        } catch (error) {
-          if (error.code === 'P2002') {
-            // Unique constraint violation - user might have been created between checks
-            user = await this.prisma.user.findUnique({
-              where: { firebaseId: verifiedUser.uid }
-            });
-            if (!user) {
-              return this.HandleError(
-                new ConflictException('Failed to create user account')
-              );
-            }
-          } else {
-            throw error;
-          }
-        }
-      } else {
-        // Update last logged in time
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            lastLoggedInAt: new Date()
-          }
-        });
-      }
-
-      return this.Results({
-        accessToken: data.idToken,
-        refreshToken: data.refreshToken,
       });
     } catch (error) {
       logger.error(`Facebook sign-in error: ${error.message || error}`);

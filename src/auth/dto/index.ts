@@ -9,5 +9,4 @@ export { SendOtpDto } from './send-otp.dto';
 export { VerifyOtpDto } from './verify-otp.dto';
 export { VerifyPasswordResetOtpDto } from './verify-password-reset-otp.dto';
 export { GoogleSignInDto } from './google-signin.dto';
-export { AppleSignInDto } from './apple-signin.dto';
 export { FacebookSignInDto } from './facebook-signin.dto';
