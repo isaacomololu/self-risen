@@ -43,7 +43,7 @@ export class ReflectionController extends BaseController {
     @Post('sessions')
     @ApiOperation({
         summary: 'Create a new reflection session',
-        description: 'Creates a new reflection session for a specific Wheel of Life category. Returns the session with a generated prompt.',
+        description: 'Creates a new reflection session for a specific Wheel of Life category. Returns the session with a generated prompt. Note: Reflection sessions do not have durations. To create a listening period with duration, use the waves endpoint after generating an affirmation.',
     })
     @ApiBody({ type: CreateSessionDto })
     @ApiResponse({

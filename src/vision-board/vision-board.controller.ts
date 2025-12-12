@@ -2,6 +2,7 @@ import {
     Controller,
     Get,
     Post,
+    Patch,
     Delete,
     Body,
     Param,
@@ -28,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { VisionBoardService } from './vision-board.service';
-import { AddVisionDto } from './dto';
+import { AddVisionDto, UpdateVisionDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -44,8 +45,8 @@ export class VisionBoardController extends BaseController {
     @UseInterceptors(FileInterceptor('image'))
     @ApiConsumes('multipart/form-data')
     @ApiOperation({
-        summary: 'Add a reflection session to vision board',
-        description: 'Adds an approved reflection session to the vision board with an uploaded image. The reflection session must be in APPROVED status.',
+        summary: 'Add a vision to vision board',
+        description: 'Adds a vision to the vision board. Can include a reflection session (must be in APPROVED status) and/or an image. Both are optional.',
     })
     @ApiBody({
         schema: {
@@ -53,16 +54,16 @@ export class VisionBoardController extends BaseController {
             properties: {
                 reflectionSessionId: {
                     type: 'string',
-                    description: 'The ID of the reflection session to add',
+                    description: 'The ID of the reflection session to add (optional)',
                     example: 'reflection-session-id-123',
                 },
                 image: {
                     type: 'string',
                     format: 'binary',
-                    description: 'Image file to display with the vision (optional, can be uploaded later)',
+                    description: 'Image file to display with the vision (optional)',
                 },
             },
-            required: ['reflectionSessionId'],
+            required: [],
         },
     })
     @ApiResponse({
@@ -71,7 +72,7 @@ export class VisionBoardController extends BaseController {
     })
     @ApiResponse({
         status: 400,
-        description: 'Invalid request or reflection session not in APPROVED status',
+        description: 'Invalid request or reflection session not in APPROVED status (if provided)',
     })
     @ApiResponse({
         status: 404,
@@ -174,100 +175,12 @@ export class VisionBoardController extends BaseController {
         });
     }
 
-    @Post('video')
-    @UseInterceptors(FileInterceptor('video'))
-    @ApiConsumes('multipart/form-data')
-    @ApiOperation({
-        summary: 'Upload/update video for vision board',
-        description: 'Uploads or updates the video compilation for the user\'s vision board.',
-    })
-    @ApiBody({
-        schema: {
-            type: 'object',
-            properties: {
-                video: {
-                    type: 'string',
-                    format: 'binary',
-                    description: 'Video file containing all visions',
-                },
-            },
-            required: ['video'],
-        },
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Video uploaded successfully',
-        schema: {
-            type: 'object',
-            properties: {
-                id: { type: 'string' },
-                userId: { type: 'string' },
-                videoUrl: { type: 'string' },
-                createdAt: { type: 'string', format: 'date-time' },
-                updatedAt: { type: 'string', format: 'date-time' },
-            },
-        },
-    })
-    @ApiResponse({
-        status: 400,
-        description: 'Invalid request or failed to upload video',
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'User not found',
-    })
-    async uploadVisionBoardVideo(
-        @FirebaseUser() user: auth.DecodedIdToken,
-        @UploadedFile() videoFile?: Express.Multer.File,
-    ) {
-        if (!videoFile) {
-            throw new BadRequestException('Video file is required');
-        }
-
-        const result = await this.visionBoardService.uploadVisionBoardVideo(user.uid, videoFile);
-        if (result.isError) throw result.error;
-
-        return this.response({
-            message: 'Video uploaded successfully',
-            data: result.data,
-        });
-    }
-
-    @Get('video')
-    @ApiOperation({
-        summary: 'Get video URL for vision board',
-        description: 'Retrieves the video URL for the user\'s vision board if one has been uploaded.',
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Video URL retrieved successfully',
-        schema: {
-            type: 'object',
-            properties: {
-                videoUrl: { type: 'string', nullable: true },
-            },
-        },
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'User not found',
-    })
-    async getVideo(@FirebaseUser() user: auth.DecodedIdToken) {
-        const result = await this.visionBoardService.getVideo(user.uid);
-        if (result.isError) throw result.error;
-
-        return this.response({
-            message: 'Video URL retrieved successfully',
-            data: result.data,
-        });
-    }
-
-    @Post('visions/:id/image')
+    @Patch('visions/:id')
     @UseInterceptors(FileInterceptor('image'))
     @ApiConsumes('multipart/form-data')
     @ApiOperation({
-        summary: 'Update image for a vision',
-        description: 'Uploads or updates the image for a vision in the vision board.',
+        summary: 'Update a vision',
+        description: 'Updates a vision in the vision board. Can update the image and/or link a reflection session. Both are optional.',
     })
     @ApiParam({
         name: 'id',
@@ -278,45 +191,48 @@ export class VisionBoardController extends BaseController {
         schema: {
             type: 'object',
             properties: {
+                reflectionSessionId: {
+                    type: 'string',
+                    description: 'The ID of the reflection session to link to the vision (optional)',
+                    example: 'reflection-session-id-123',
+                },
                 image: {
                     type: 'string',
                     format: 'binary',
-                    description: 'Image file to display with the vision',
+                    description: 'Image file to display with the vision (optional)',
                 },
             },
-            required: ['image'],
+            required: [],
         },
     })
     @ApiResponse({
         status: 200,
-        description: 'Image updated successfully',
+        description: 'Vision updated successfully',
     })
     @ApiResponse({
         status: 400,
-        description: 'Invalid request or failed to upload image',
+        description: 'Invalid request, failed to upload image, or reflection session validation failed',
     })
     @ApiResponse({
         status: 404,
-        description: 'Vision not found',
+        description: 'Vision or reflection session not found',
     })
-    async updateVisionImage(
+    async updateVision(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('id') visionId: string,
+        @Body() dto: UpdateVisionDto,
         @UploadedFile() imageFile?: Express.Multer.File,
     ) {
-        if (!imageFile) {
-            throw new BadRequestException('Image file is required');
-        }
-
-        const result = await this.visionBoardService.updateVisionImage(
+        const result = await this.visionBoardService.updateVision(
             user.uid,
             visionId,
+            dto.reflectionSessionId,
             imageFile,
         );
         if (result.isError) throw result.error;
 
         return this.response({
-            message: 'Image updated successfully',
+            message: 'Vision updated successfully',
             data: result.data,
         });
     }

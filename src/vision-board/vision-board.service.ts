@@ -16,23 +16,10 @@ export class VisionBoardService extends BaseService {
         super();
     }
 
-    private async getOrCreateVisionBoard(userId: string) {
-        let visionBoard = await this.prisma.visionBoard.findUnique({
-            where: { userId },
-        });
-
-        if (!visionBoard) {
-            visionBoard = await this.prisma.visionBoard.create({
-                data: { userId },
-            });
-        }
-
-        return visionBoard;
-    }
 
     async addVision(
         firebaseId: string,
-        reflectionSessionId: string,
+        reflectionSessionId?: string,
         imageFile?: Express.Multer.File,
     ) {
         const user = await this.getUserByFirebaseId(firebaseId);
@@ -40,44 +27,65 @@ export class VisionBoardService extends BaseService {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        const reflectionSession = await this.prisma.reflectionSession.findFirst({
-            where: {
-                id: reflectionSessionId,
-                userId: user.id,
-            },
-            include: {
-                category: {
-                    select: {
-                        id: true,
-                        name: true,
+        // Validate that at least one parameter is provided
+        if (!reflectionSessionId && !imageFile) {
+            return this.HandleError(
+                new BadRequestException('Either reflectionSessionId or imageFile must be provided'),
+            );
+        }
+
+        type ReflectionSessionWithCategory = {
+            id: string;
+            status: ReflectionSessionStatus;
+            approvedAffirmation: string | null;
+            generatedAffirmation: string | null;
+            prompt: string;
+            category: {
+                id: string;
+                name: string;
+            };
+        };
+
+        let reflectionSession: ReflectionSessionWithCategory | null = null;
+        if (reflectionSessionId) {
+            const foundSession = await this.prisma.reflectionSession.findFirst({
+                where: {
+                    id: reflectionSessionId,
+                    userId: user.id,
+                },
+                include: {
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
                     },
                 },
-            },
-        });
+            });
 
-        if (!reflectionSession) {
-            return this.HandleError(new NotFoundException('Reflection session not found'));
+            if (!foundSession) {
+                return this.HandleError(new NotFoundException('Reflection session not found'));
+            }
+
+            if (foundSession.status !== ReflectionSessionStatus.AFFIRMATION_GENERATED) {
+                return this.HandleError(
+                    new BadRequestException('Reflection session must be in AFFIRMATION_GENERATED status to add to vision board'),
+                );
+            }
+
+            // Check if already added to vision board
+            const existingItem = await this.prisma.vision.findUnique({
+                where: { reflectionSessionId },
+            });
+
+            if (existingItem) {
+                return this.HandleError(
+                    new BadRequestException('This reflection session is already in the vision board'),
+                );
+            }
+
+            reflectionSession = foundSession;
         }
-
-        if (reflectionSession.status !== ReflectionSessionStatus.AFFIRMATION_GENERATED) {
-            return this.HandleError(
-                new BadRequestException('Reflection session must be in APPROVED status to add to vision board'),
-            );
-        }
-
-        // Check if already added to vision board
-        const existingItem = await this.prisma.visionBoardItem.findUnique({
-            where: { reflectionSessionId },
-        });
-
-        if (existingItem) {
-            return this.HandleError(
-                new BadRequestException('This reflection session is already in the vision board'),
-            );
-        }
-
-        // Get or create vision board
-        const visionBoard = await this.getOrCreateVisionBoard(user.id);
 
         let imageUrl: string | undefined;
         if (imageFile) {
@@ -96,27 +104,29 @@ export class VisionBoardService extends BaseService {
             }
         }
 
-        const maxOrderItem = await this.prisma.visionBoardItem.findFirst({
-            where: { visionBoardId: visionBoard.id },
+        const maxOrderItem = await this.prisma.vision.findFirst({
+            where: { userId: user.id },
             orderBy: { order: 'desc' },
         });
 
         const order = maxOrderItem ? (maxOrderItem.order || 0) + 1 : 1;
 
-        // Create vision board item
+        // Create vision
         const createData: any = {
-            visionBoardId: visionBoard.id,
-            reflectionSessionId: reflectionSession.id,
+            userId: user.id,
             order,
         };
+        if (reflectionSessionId) {
+            createData.reflectionSessionId = reflectionSessionId;
+        }
         if (imageUrl) {
             createData.imageUrl = imageUrl;
         }
 
-        const visionItem = await this.prisma.visionBoardItem.create({
+        const visionItem = await this.prisma.vision.create({
             data: createData,
             include: {
-                reflectionSession: {
+                reflectionSession: reflectionSessionId ? {
                     include: {
                         category: {
                             select: {
@@ -125,26 +135,31 @@ export class VisionBoardService extends BaseService {
                             },
                         },
                     },
-                },
+                } : false,
             },
         });
 
         // Format response
-        const response = {
+        const response: any = {
             id: visionItem.id,
-            visionBoardId: visionItem.visionBoardId,
             reflectionSessionId: visionItem.reflectionSessionId,
             imageUrl: visionItem.imageUrl,
             order: visionItem.order,
             createdAt: visionItem.createdAt,
             updatedAt: visionItem.updatedAt,
-            affirmation: reflectionSession.approvedAffirmation || reflectionSession.generatedAffirmation,
-            reflectionSession: {
+        };
+
+        if (reflectionSession && visionItem.reflectionSession) {
+            response.affirmation = reflectionSession.approvedAffirmation || reflectionSession.generatedAffirmation;
+            response.reflectionSession = {
                 id: reflectionSession.id,
                 prompt: reflectionSession.prompt,
                 category: reflectionSession.category,
-            },
-        };
+            };
+        } else {
+            response.affirmation = null;
+            response.reflectionSession = null;
+        }
 
         return this.Results(response);
     }
@@ -162,15 +177,12 @@ export class VisionBoardService extends BaseService {
         const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
         const skip = (pageNumber - 1) * pageSize;
 
-        // Get or create vision board
-        const visionBoard = await this.getOrCreateVisionBoard(user.id);
-
-        const totalCount = await this.prisma.visionBoardItem.count({
-            where: { visionBoardId: visionBoard.id },
+        const totalCount = await this.prisma.vision.count({
+            where: { userId: user.id },
         });
 
-        const items = await this.prisma.visionBoardItem.findMany({
-            where: { visionBoardId: visionBoard.id },
+        const items = await this.prisma.vision.findMany({
+            where: { userId: user.id },
             orderBy: { order: 'asc' },
             skip,
             take: pageSize,
@@ -191,21 +203,30 @@ export class VisionBoardService extends BaseService {
         const totalPages = Math.ceil(totalCount / pageSize);
 
         // Format response
-        const data = items.map((item) => ({
-            id: item.id,
-            visionBoardId: item.visionBoardId,
-            reflectionSessionId: item.reflectionSessionId,
-            imageUrl: item.imageUrl,
-            order: item.order,
-            createdAt: item.createdAt,
-            updatedAt: item.updatedAt,
-            affirmation: item.reflectionSession.approvedAffirmation || item.reflectionSession.generatedAffirmation,
-            reflectionSession: {
-                id: item.reflectionSession.id,
-                prompt: item.reflectionSession.prompt,
-                category: item.reflectionSession.category,
-            },
-        }));
+        const data = items.map((item) => {
+            const response: any = {
+                id: item.id,
+                reflectionSessionId: item.reflectionSessionId,
+                imageUrl: item.imageUrl,
+                order: item.order,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+            };
+
+            if (item.reflectionSession) {
+                response.affirmation = item.reflectionSession.approvedAffirmation || item.reflectionSession.generatedAffirmation;
+                response.reflectionSession = {
+                    id: item.reflectionSession.id,
+                    prompt: item.reflectionSession.prompt,
+                    category: item.reflectionSession.category,
+                };
+            } else {
+                response.affirmation = null;
+                response.reflectionSession = null;
+            }
+
+            return response;
+        });
 
         return this.Results({
             data,
@@ -229,13 +250,10 @@ export class VisionBoardService extends BaseService {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        // Get or create vision board to ensure user has one
-        const visionBoard = await this.getOrCreateVisionBoard(user.id);
-
-        const visionItem = await this.prisma.visionBoardItem.findFirst({
+        const visionItem = await this.prisma.vision.findFirst({
             where: {
                 id: visionId,
-                visionBoardId: visionBoard.id,
+                userId: user.id,
             },
             include: {
                 reflectionSession: {
@@ -256,103 +274,55 @@ export class VisionBoardService extends BaseService {
         }
 
         // Format response
-        const response = {
+        const response: any = {
             id: visionItem.id,
-            visionBoardId: visionItem.visionBoardId,
             reflectionSessionId: visionItem.reflectionSessionId,
             imageUrl: visionItem.imageUrl,
             order: visionItem.order,
             createdAt: visionItem.createdAt,
             updatedAt: visionItem.updatedAt,
-            affirmation: visionItem.reflectionSession.approvedAffirmation || visionItem.reflectionSession.generatedAffirmation,
-            reflectionSession: {
+        };
+
+        if (visionItem.reflectionSession) {
+            response.affirmation = visionItem.reflectionSession.approvedAffirmation || visionItem.reflectionSession.generatedAffirmation;
+            response.reflectionSession = {
                 id: visionItem.reflectionSession.id,
                 prompt: visionItem.reflectionSession.prompt,
                 category: visionItem.reflectionSession.category,
-            },
-        };
+            };
+        } else {
+            response.affirmation = null;
+            response.reflectionSession = null;
+        }
 
         return this.Results(response);
     }
 
     /**
-     * Upload/update video for vision board
+     * Update a vision (image and/or reflection session)
      */
-    async uploadVisionBoardVideo(firebaseId: string, videoFile: Express.Multer.File) {
-        const user = await this.getUserByFirebaseId(firebaseId);
-        if (!user) {
-            return this.HandleError(new NotFoundException('User not found'));
-        }
-
-        // Get or create vision board
-        const visionBoard = await this.getOrCreateVisionBoard(user.id);
-
-        // Upload video
-        let videoUrl: string;
-        try {
-            const uploadResult = await this.storageService.uploadFile(
-                videoFile,
-                FileType.VIDEO,
-                user.id,
-                'vision-board/videos',
-            );
-            videoUrl = uploadResult.url;
-        } catch (error) {
-            return this.HandleError(
-                new BadRequestException(`Failed to upload video: ${error.message}`),
-            );
-        }
-
-        // Update vision board with video URL
-        const updatedBoard = await this.prisma.visionBoard.update({
-            where: { id: visionBoard.id },
-            data: { videoUrl },
-        });
-
-        return this.Results({
-            id: updatedBoard.id,
-            userId: updatedBoard.userId,
-            videoUrl: updatedBoard.videoUrl,
-            createdAt: updatedBoard.createdAt,
-            updatedAt: updatedBoard.updatedAt,
-        });
-    }
-
-    /**
-     * Get video URL for user's vision board
-     */
-    async getVideo(firebaseId: string) {
-        const user = await this.getUserByFirebaseId(firebaseId);
-        if (!user) {
-            return this.HandleError(new NotFoundException('User not found'));
-        }
-
-        const visionBoard = await this.getOrCreateVisionBoard(user.id);
-
-        return this.Results({
-            videoUrl: visionBoard.videoUrl || null,
-        });
-    }
-
-    /**
-     * Update image for a vision
-     */
-    async updateVisionImage(
+    async updateVision(
         firebaseId: string,
         visionId: string,
-        imageFile: Express.Multer.File,
+        reflectionSessionId?: string,
+        imageFile?: Express.Multer.File,
     ) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        const visionBoard = await this.getOrCreateVisionBoard(user.id);
+        // Validate that at least one parameter is provided
+        if (!reflectionSessionId && !imageFile) {
+            return this.HandleError(
+                new BadRequestException('Either reflectionSessionId or imageFile must be provided'),
+            );
+        }
 
-        const visionItem = await this.prisma.visionBoardItem.findFirst({
+        const visionItem = await this.prisma.vision.findFirst({
             where: {
                 id: visionId,
-                visionBoardId: visionBoard.id,
+                userId: user.id,
             },
             include: {
                 reflectionSession: {
@@ -372,26 +342,67 @@ export class VisionBoardService extends BaseService {
             return this.HandleError(new NotFoundException('Vision not found'));
         }
 
-        // Upload new image
-        let imageUrl: string;
-        try {
-            const uploadResult = await this.storageService.uploadFile(
-                imageFile,
-                FileType.IMAGE,
-                user.id,
-                'vision-board/images',
-            );
-            imageUrl = uploadResult.url;
-        } catch (error) {
-            return this.HandleError(
-                new BadRequestException(`Failed to upload image: ${error.message}`),
-            );
+        if (reflectionSessionId) {
+            const foundSession = await this.prisma.reflectionSession.findFirst({
+                where: {
+                    id: reflectionSessionId,
+                    userId: user.id,
+                },
+            });
+
+            if (!foundSession) {
+                return this.HandleError(new NotFoundException('Reflection session not found'));
+            }
+
+            if (foundSession.status !== ReflectionSessionStatus.AFFIRMATION_GENERATED) {
+                return this.HandleError(
+                    new BadRequestException('Reflection session must be in AFFIRMATION_GENERATED status to link to vision board'),
+                );
+            }
+
+            // Check if already linked to another vision
+            const existingItem = await this.prisma.vision.findUnique({
+                where: { reflectionSessionId },
+            });
+
+            if (existingItem && existingItem.id !== visionId) {
+                return this.HandleError(
+                    new BadRequestException('This reflection session is already linked to another vision'),
+                );
+            }
         }
 
-        // Update vision item with new image
-        const updatedItem = await this.prisma.visionBoardItem.update({
+        // Upload new image if provided
+        let imageUrl: string | undefined;
+        if (imageFile) {
+            try {
+                const uploadResult = await this.storageService.uploadFile(
+                    imageFile,
+                    FileType.IMAGE,
+                    user.id,
+                    'vision-board/images',
+                );
+                imageUrl = uploadResult.url;
+            } catch (error) {
+                return this.HandleError(
+                    new BadRequestException(`Failed to upload image: ${error.message}`),
+                );
+            }
+        }
+
+        // Prepare update data
+        const updateData: any = {};
+        if (imageUrl !== undefined) {
+            updateData.imageUrl = imageUrl;
+        }
+        if (reflectionSessionId !== undefined) {
+            updateData.reflectionSessionId = reflectionSessionId;
+        }
+
+        // Update vision
+        const updatedItem = await this.prisma.vision.update({
             where: { id: visionId },
-            data: { imageUrl },
+            data: updateData,
             include: {
                 reflectionSession: {
                     include: {
@@ -407,21 +418,26 @@ export class VisionBoardService extends BaseService {
         });
 
         // Format response
-        const response = {
+        const response: any = {
             id: updatedItem.id,
-            visionBoardId: updatedItem.visionBoardId,
             reflectionSessionId: updatedItem.reflectionSessionId,
             imageUrl: updatedItem.imageUrl,
             order: updatedItem.order,
             createdAt: updatedItem.createdAt,
             updatedAt: updatedItem.updatedAt,
-            affirmation: updatedItem.reflectionSession.approvedAffirmation || updatedItem.reflectionSession.generatedAffirmation,
-            reflectionSession: {
+        };
+
+        if (updatedItem.reflectionSession) {
+            response.affirmation = updatedItem.reflectionSession.approvedAffirmation || updatedItem.reflectionSession.generatedAffirmation;
+            response.reflectionSession = {
                 id: updatedItem.reflectionSession.id,
                 prompt: updatedItem.reflectionSession.prompt,
                 category: updatedItem.reflectionSession.category,
-            },
-        };
+            };
+        } else {
+            response.affirmation = null;
+            response.reflectionSession = null;
+        }
 
         return this.Results(response);
     }
@@ -435,12 +451,10 @@ export class VisionBoardService extends BaseService {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        const visionBoard = await this.getOrCreateVisionBoard(user.id);
-
-        const visionItem = await this.prisma.visionBoardItem.findFirst({
+        const visionItem = await this.prisma.vision.findFirst({
             where: {
                 id: visionId,
-                visionBoardId: visionBoard.id,
+                userId: user.id,
             },
         });
 
@@ -448,7 +462,7 @@ export class VisionBoardService extends BaseService {
             return this.HandleError(new NotFoundException('Vision not found'));
         }
 
-        await this.prisma.visionBoardItem.delete({
+        await this.prisma.vision.delete({
             where: { id: visionId },
         });
 

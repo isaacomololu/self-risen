@@ -36,22 +36,33 @@ export class TranscriptionService extends BaseService {
             // Fetch the audio file from the URL
             const response = await fetch(audioUrl);
             if (!response.ok) {
-                throw new Error(`Failed to fetch audio file: ${response.statusText}`);
+                throw new Error(`Failed to fetch audio file: ${response.status} ${response.statusText}`);
             }
 
             const audioBuffer = Buffer.from(await response.arrayBuffer());
-
-            // Create a File object for OpenAI API
-            // In Node.js 18+, File is available globally
-            // Create File with proper MIME type detection
             const contentType = response.headers.get('content-type') || 'audio/mpeg';
-            const fileName = audioUrl.split('/').pop() || 'audio.mp3';
-
-            // Create File object (available in Node.js 18+)
-            const audioFile = new File([audioBuffer], fileName, { type: contentType });
+            
+            // Determine file extension from content type or URL
+            let fileExtension = 'mp3';
+            if (contentType.includes('wav')) fileExtension = 'wav';
+            else if (contentType.includes('ogg')) fileExtension = 'ogg';
+            else if (contentType.includes('m4a')) fileExtension = 'm4a';
+            else if (contentType.includes('webm')) fileExtension = 'webm';
+            
+            this.logger.debug(`Fetched audio file, Size: ${audioBuffer.length} bytes, Type: ${contentType}`);
 
             // Use OpenAI Whisper API for transcription
             const model = config.OPENAI_MODEL || 'whisper-1';
+            this.logger.debug(`Transcribing with model: ${model}`);
+            
+            // Use OpenAI's toFile utility to create a proper file object from buffer
+            // This ensures compatibility with OpenAI SDK v6
+            const { toFile } = await import('openai');
+            const fileName = `audio.${fileExtension}`;
+            const audioFile = await toFile(audioBuffer, fileName, {
+                type: contentType,
+            });
+
             const transcription = await this.openai.audio.transcriptions.create({
                 file: audioFile,
                 model: model,
@@ -64,6 +75,12 @@ export class TranscriptionService extends BaseService {
             return transcribedText;
         } catch (error) {
             this.logger.error(`Error transcribing audio: ${error.message}`, error.stack);
+            
+            // Provide more detailed error information
+            if (error.message.includes('404')) {
+                throw new Error(`Failed to transcribe audio: The audio file URL is not accessible. This may be due to an expired signed URL or network issue. Original error: ${error.message}`);
+            }
+            
             throw new Error(`Failed to transcribe audio: ${error.message}`);
         }
     }

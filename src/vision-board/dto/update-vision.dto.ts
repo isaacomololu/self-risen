@@ -1,9 +1,9 @@
 import { IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class AddVisionDto {
+export class UpdateVisionDto {
     @ApiProperty({
-        description: 'The ID of the reflection session to add to the vision board (optional)',
+        description: 'The ID of the reflection session to link to the vision (optional)',
         example: 'reflection-session-id-123',
         required: false,
     })
