@@ -135,6 +135,9 @@ class Config {
 
     @IsString()
     OPENAI_TTS_VOICE?: string;
+
+    @IsString()
+    OPENAI_TRANSCRIPTION_MODEL: string;
 }
 
 export let config: Config;

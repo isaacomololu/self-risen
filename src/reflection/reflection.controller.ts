@@ -46,15 +46,6 @@ export class ReflectionController extends BaseController {
         description: 'Creates a new reflection session for a specific Wheel of Life category. Returns the session with a generated prompt. Note: Reflection sessions do not have durations. To create a listening period with duration, use the waves endpoint after generating an affirmation.',
     })
     @ApiBody({ type: CreateSessionDto })
-    @ApiResponse({
-        status: 201,
-        description: 'Reflection session created successfully',
-        type: ReflectionSessionResponseDto,
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'User or category not found',
-    })
     async createSession(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Body() dto: CreateSessionDto,
@@ -78,16 +69,7 @@ export class ReflectionController extends BaseController {
         description: 'The unique identifier of the reflection session',
         example: 'session-id-123',
     })
-    @ApiResponse({
-        status: 200,
-        description: 'Reflection session retrieved successfully',
-        type: ReflectionSessionResponseDto,
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Reflection session not found',
-    })
-    async getSessionById(
+   async getSessionById(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('sessionId') sessionId: string,
     ) {
@@ -118,30 +100,6 @@ export class ReflectionController extends BaseController {
         type: Number,
         description: 'Number of items per page (default: 10, max: 100)',
         example: 10,
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Reflection sessions retrieved successfully',
-        schema: {
-            example: {
-                message: 'Reflection sessions retrieved',
-                data: {
-                    data: [],
-                    pagination: {
-                        page: 1,
-                        limit: 10,
-                        total: 0,
-                        totalPages: 0,
-                        hasNextPage: false,
-                        hasPreviousPage: false,
-                    },
-                },
-            },
-        },
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'User not found',
     })
     async getAllSessions(
         @FirebaseUser() user: auth.DecodedIdToken,
@@ -193,29 +151,12 @@ export class ReflectionController extends BaseController {
             },
         },
     })
-    @ApiResponse({
-        status: 200,
-        description: 'Belief submitted successfully',
-        type: ReflectionSessionResponseDto,
-    })
-    @ApiResponse({
-        status: 400,
-        description: 'Invalid request - either text or audio file must be provided',
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Reflection session not found',
-    })
     async submitBelief(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('sessionId') sessionId: string,
         @Body() dto: SubmitBeliefDto,
         @UploadedFile() file?: Express.Multer.File,
     ) {
-        if (!file && !dto.text) {
-            throw new BadRequestException('Either text or audio file must be provided');
-        }
-
         const result = await this.reflectionService.submitBelief(
             user.uid,
             sessionId,

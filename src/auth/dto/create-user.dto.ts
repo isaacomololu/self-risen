@@ -21,9 +21,4 @@ export class SignUp {
     @IsNotEmpty()
     @IsString()
     password: string;
-
-    @ApiProperty({ required: true })
-    @IsOptional()
-    @IsString()
-    avatar: string;
 }

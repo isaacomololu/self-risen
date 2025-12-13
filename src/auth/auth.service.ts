@@ -36,7 +36,7 @@ export class AuthService extends BaseService {
   }
 
   async signUp(payload: SignUp) {
-    const { name, email, password, avatar } = payload;
+    const { name, email, password } = payload;
 
     let firebaseUser: auth.UserRecord;
     try {
@@ -73,7 +73,6 @@ export class AuthService extends BaseService {
           firebaseId: firebaseUser.uid,
           email,
           name,
-          avatar,
           lastLoggedInAt: new Date()
         }
       });
