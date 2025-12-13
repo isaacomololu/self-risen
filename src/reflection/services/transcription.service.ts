@@ -20,36 +20,60 @@ export class TranscriptionService extends BaseService {
     }
 
     /**
-     * Transcribe audio file from URL using OpenAI Whisper API
-     * @param audioUrl - URL of the audio file to transcribe
+     * Transcribe audio file from URL or file buffer using OpenAI Whisper API
+     * @param audioInput - URL string of the audio file or Express.Multer.File to transcribe
      * @returns Transcribed text
      */
-    async transcribeAudio(audioUrl: string): Promise<string> {
+    async transcribeAudio(audioInput: string | Express.Multer.File): Promise<string> {
         if (!this.openai) {
             this.logger.warn('OpenAI not configured. Returning placeholder transcription.');
             return '[Transcription unavailable - OpenAI API key not configured]';
         }
 
         try {
-            this.logger.log(`Starting transcription for audio: ${audioUrl}`);
+            let audioBuffer: Buffer;
+            let contentType: string;
+            let fileExtension: string;
 
-            // Fetch the audio file from the URL
-            const response = await fetch(audioUrl);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch audio file: ${response.status} ${response.statusText}`);
+            // Handle both URL string and file buffer inputs
+            if (typeof audioInput === 'string') {
+                // Legacy support: fetch from URL
+                this.logger.log(`Starting transcription for audio URL: ${audioInput}`);
+                const response = await fetch(audioInput);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch audio file: ${response.status} ${response.statusText}`);
+                }
+
+                audioBuffer = Buffer.from(await response.arrayBuffer());
+                contentType = response.headers.get('content-type') || 'audio/mpeg';
+                
+                // Determine file extension from content type or URL
+                fileExtension = 'mp3';
+                if (contentType.includes('wav')) fileExtension = 'wav';
+                else if (contentType.includes('ogg')) fileExtension = 'ogg';
+                else if (contentType.includes('m4a')) fileExtension = 'm4a';
+                else if (contentType.includes('webm')) fileExtension = 'webm';
+            } else {
+                // Direct file buffer input
+                this.logger.log(`Starting transcription for audio file: ${audioInput.originalname || 'audio'}`);
+                audioBuffer = audioInput.buffer;
+                contentType = audioInput.mimetype || 'audio/mpeg';
+                
+                // Determine file extension from mimetype or originalname
+                fileExtension = 'mp3';
+                if (contentType.includes('wav')) fileExtension = 'wav';
+                else if (contentType.includes('ogg')) fileExtension = 'ogg';
+                else if (contentType.includes('m4a')) fileExtension = 'm4a';
+                else if (contentType.includes('webm')) fileExtension = 'webm';
+                else if (audioInput.originalname) {
+                    const ext = audioInput.originalname.split('.').pop()?.toLowerCase();
+                    if (ext && ['wav', 'ogg', 'm4a', 'webm', 'mp3'].includes(ext)) {
+                        fileExtension = ext;
+                    }
+                }
             }
-
-            const audioBuffer = Buffer.from(await response.arrayBuffer());
-            const contentType = response.headers.get('content-type') || 'audio/mpeg';
             
-            // Determine file extension from content type or URL
-            let fileExtension = 'mp3';
-            if (contentType.includes('wav')) fileExtension = 'wav';
-            else if (contentType.includes('ogg')) fileExtension = 'ogg';
-            else if (contentType.includes('m4a')) fileExtension = 'm4a';
-            else if (contentType.includes('webm')) fileExtension = 'webm';
-            
-            this.logger.debug(`Fetched audio file, Size: ${audioBuffer.length} bytes, Type: ${contentType}`);
+            this.logger.debug(`Processing audio file, Size: ${audioBuffer.length} bytes, Type: ${contentType}`);
 
             // Use OpenAI Whisper API for transcription
             const model = config.OPENAI_MODEL || 'whisper-1';

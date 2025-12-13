@@ -44,7 +44,6 @@ export class AuthService extends BaseService {
         email,
         password,
         displayName: name,
-        photoURL: avatar,
       });
     } catch (error) {
       if (error.code === 'auth/email-already-exists') {
@@ -540,54 +539,6 @@ export class AuthService extends BaseService {
 
     return true;
   }
-
-  // async resetPassword(payload: ResetPasswordDto) {
-  //   const { newPassword, token } = payload;
-
-  //   let verifiedUser: auth.DecodedIdToken;
-  //   try {
-  //     verifiedUser = await auth().verifyIdToken(token, true);
-  //   } catch (error) {
-  //     if (error.code === 'auth/id-token-expired') {
-  //       return this.HandleError(
-  //         new UnauthorizedException('Verification token has expired. Please try again.')
-  //       );
-  //     }
-  //     return this.HandleError(
-  //       new UnauthorizedException('Invalid verification token')
-  //     );
-  //   }
-
-  //   const firebaseUser = await auth().getUser(verifiedUser.uid);
-
-  //   const user = await this.prisma.user.findUnique({
-  //     where: { firebaseId: verifiedUser.uid }
-  //   });
-
-  //   if (!user) {
-  //     return this.HandleError(
-  //       new UnauthorizedException('User not found')
-  //     );
-  //   }
-
-  //   if (firebaseUser.email && user.email !== firebaseUser.email) {
-  //     return this.HandleError(
-  //       new UnauthorizedException('Email mismatch')
-  //     );
-  //   }
-
-  //   try {
-  //     await auth().updateUser(verifiedUser.uid, {
-  //       password: newPassword
-  //     });
-  //   } catch (error) {
-  //     return this.HandleError(error);
-  //   }
-
-  //   await auth().revokeRefreshTokens(verifiedUser.uid);
-
-  //   return this.Results(user);
-  // }
 
   async verifyPasswordResetOtp(payload: VerifyPasswordResetOtpDto) {
     const { email, otp } = payload;

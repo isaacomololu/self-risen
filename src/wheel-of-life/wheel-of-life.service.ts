@@ -254,60 +254,6 @@ export class WheelOfLifeService extends BaseService {
         return this.Results(breakdown);
     }
 
-    async chooseFocus(firebaseId: string, payload: ChooseFocusDto) {
-        const user = await this.getUserByFirebaseId(firebaseId);
-        if (!user) {
-            return this.HandleError(new NotFoundException('User not found'));
-        }
-
-        const wheel = await this.getWheelByUserId(user.id);
-        if (!wheel) {
-            return this.HandleError(new NotFoundException('Wheel not found'));
-        }
-
-        // Validate category belongs to user's wheel
-        const category = await this.prisma.wheelCategory.findFirst({
-            where: {
-                id: payload.categoryId,
-                wheelId: wheel.id,
-            },
-        });
-
-        if (!category) {
-            return this.HandleError(new NotFoundException('Category not found'));
-        }
-
-        const existingFocus = await this.prisma.wheelFocus.findFirst({
-            where: {
-                categoryId: payload.categoryId,
-                wheelId: wheel.id,
-                isActive: true,
-            },
-        });
-
-        if (existingFocus) {
-            return this.HandleError(new BadRequestException('Focus already exists'));
-        }
-
-
-        // Create new focus record
-        const focus = await this.prisma.wheelFocus.create({
-            data: {
-                wheelId: wheel.id,
-                categoryId: payload.categoryId,
-                isActive: true,
-            },
-            include: {
-                category: true,
-                wheelAssessment: true,
-            },
-        });
-
-        return this.Results({
-            focus: this.mapFocusToResponse(focus),
-        });
-    }
-
     async getAssessmentHistory(firebaseId: string) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
@@ -338,111 +284,6 @@ export class WheelOfLifeService extends BaseService {
         return this.Results(assessments);
     }
 
-    async getFocuses(firebaseId: string, activeOnly?: boolean) {
-        const user = await this.getUserByFirebaseId(firebaseId);
-        if (!user) {
-            return this.HandleError(new NotFoundException('User not found'));
-        }
-
-        const wheel = await this.getWheelByUserId(user.id);
-        if (!wheel) {
-            return this.HandleError(new NotFoundException('Wheel not found'));
-        }
-
-        const where: any = { wheelId: wheel.id };
-        if (activeOnly !== undefined) {
-            where.isActive = activeOnly;
-        }
-
-        const focuses = await this.prisma.wheelFocus.findMany({
-            where,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                category: true,
-                wheelAssessment: true,
-            },
-        });
-
-        // const focusResponses = focuses.map((focus) => this.mapFocusToResponse(focus));
-        const activeCount = focuses.filter((f) => f.isActive).length;
-        const completedCount = focuses.filter((f) => f.completedAt).length;
-
-        return this.Results({
-            focuses,
-            activeCount,
-            completedCount,
-        });
-    }
-
-    // async completeFocus(firebaseId: string, focusId: string) {
-    //     const user = await this.getUserByFirebaseId(firebaseId);
-    //     if (!user) {
-    //         return this.HandleError(new NotFoundException('User not found'));
-    //     }
-
-    //     const wheel = await this.getWheelByUserId(user.id);
-    //     if (!wheel) {
-    //         return this.HandleError(new NotFoundException('Wheel not found'));
-    //     }
-
-    //     // Validate focus belongs to user's wheel
-    //     const focus = await this.prisma.wheelFocus.findFirst({
-    //         where: {
-    //             id: focusId,
-    //             wheelId: wheel.id,
-    //         },
-    //     });
-
-    //     if (!focus) {
-    //         return this.HandleError(new NotFoundException('Focus not found'));
-    //     }
-
-    //     const completedAt = new Date();
-    //     const updated = await this.prisma.wheelFocus.update({
-    //         where: { id: focusId },
-    //         data: {
-    //             isActive: false,
-    //             completedAt: completedAt ? new Date(completedAt) : null
-    //         },
-    //         include: {
-    //             category: true,
-    //             wheelAssessment: true,
-    //         },
-    //     });
-
-    //     return this.Results(updated);
-    // }
-
-    async deleteFocus(firebaseId: string, focusId: string) {
-        const user = await this.getUserByFirebaseId(firebaseId);
-        if (!user) {
-            return this.HandleError(new NotFoundException('User not found'));
-        }
-
-        const wheel = await this.getWheelByUserId(user.id);
-        if (!wheel) {
-            return this.HandleError(new NotFoundException('Wheel not found'));
-        }
-
-        // Validate focus belongs to user's wheel
-        const focus = await this.prisma.wheelFocus.findFirst({
-            where: {
-                id: focusId,
-                wheelId: wheel.id,
-            },
-        });
-
-        if (!focus) {
-            return this.HandleError(new NotFoundException('Focus not found'));
-        }
-
-        await this.prisma.wheelFocus.delete({
-            where: { id: focusId },
-        });
-
-        return this.Results(null);
-    }
-
     // Helper methods
     private async getUserByFirebaseId(firebaseId: string) {
         return this.prisma.user.findUnique({
@@ -455,24 +296,6 @@ export class WheelOfLifeService extends BaseService {
             where: { userId },
             include: { categories: true },
         });
-    }
-
-    /**
-     * Map Prisma focus to response format
-     */
-    private mapFocusToResponse(focus: any): FocusResponse {
-        return {
-            id: focus.id,
-            wheelId: focus.wheelId,
-            categoryId: focus.categoryId,
-            categoryName: focus.category.name,
-            assessmentId: focus.assessmentId || undefined,
-            isActive: focus.isActive,
-            startedAt: focus.startedAt,
-            completedAt: focus.completedAt || undefined,
-            createdAt: focus.createdAt,
-            updatedAt: focus.updatedAt,
-        };
     }
 
     private calculateBreakdown(

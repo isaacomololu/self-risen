@@ -20,5 +20,5 @@ export class CreateWaveDto {
     @IsInt()
     @IsIn([1, 3, 7, 14, 30])
     @Min(1)
-    durationDays?: number;
+    durationDays: number;
 }

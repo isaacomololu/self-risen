@@ -57,47 +57,19 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('Category not found or does not belong to user'));
         }
 
-        if (dto.wheelFocusId) {
-            const wheelFocus = await this.prisma.wheelFocus.findFirst({
-                where: {
-                    id: dto.wheelFocusId,
-                    wheel: { userId: user.id },
-                    categoryId: dto.categoryId,
-                },
-            });
-
-            if (!wheelFocus) {
-                return this.HandleError(new NotFoundException('WheelFocus not found or does not match category'));
-            }
-        }
-
         const prompt = this.generatePrompt(category.name);
 
         const session = await this.prisma.reflectionSession.create({
             data: {
                 userId: user.id,
                 categoryId: dto.categoryId,
-                wheelFocusId: dto.wheelFocusId,
                 prompt,
                 status: 'PENDING',
             },
-            include: {
-                category: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
-            },
         });
 
-        // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...session,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(session),
-        };
 
-        return this.Results(sessionWithAudio);
+        return this.Results(session);
     }
 
     async getSessionById(firebaseId: string, sessionId: string) {
@@ -110,15 +82,7 @@ export class ReflectionService extends BaseService {
             where: {
                 id: sessionId,
                 userId: user.id,
-            },
-            include: {
-                category: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
-            },
+            }
         });
 
         if (!session) {
@@ -126,12 +90,7 @@ export class ReflectionService extends BaseService {
         }
 
         // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...session,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(session),
-        };
-
-        return this.Results(sessionWithAudio);
+        return this.Results(session);
     }
 
     async getAllSessions(
@@ -169,16 +128,10 @@ export class ReflectionService extends BaseService {
             },
         });
 
-        // Add computed affirmationAudioUrl field to each session
-        const sessionsWithAudio = sessions.map((session) => ({
-            ...session,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(session),
-        }));
-
         const totalPages = Math.ceil(totalCount / pageSize);
 
         return this.Results({
-            data: sessionsWithAudio,
+            data: sessions,
             pagination: {
                 page: pageNumber,
                 limit: pageSize,
@@ -226,20 +179,10 @@ export class ReflectionService extends BaseService {
         let audioUrl: string | undefined;
         let transcriptionText: string | undefined;
 
-        // Handle audio file upload and transcription
+        // Handle audio file transcription
         if (audioFile) {
             try {
-                // Upload audio file
-                const uploadResult = await this.storageService.uploadFile(
-                    audioFile,
-                    FileType.AUDIO,
-                    user.id,
-                    'reflections',
-                );
-                audioUrl = uploadResult.url;
-
-                // Transcribe audio
-                transcriptionText = await this.transcriptionService.transcribeAudio(audioUrl);
+                transcriptionText = await this.transcriptionService.transcribeAudio(audioFile);
                 rawBeliefText = transcriptionText;
             } catch (error) {
                 return this.HandleError(
@@ -247,7 +190,6 @@ export class ReflectionService extends BaseService {
                 );
             }
         } else if (dto.text) {
-            // Use text input directly
             rawBeliefText = dto.text;
         } else {
             return this.HandleError(
@@ -274,13 +216,7 @@ export class ReflectionService extends BaseService {
             },
         });
 
-        // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...updatedSession,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
-        };
-
-        return this.Results(sessionWithAudio);
+        return this.Results(updatedSession);
     }
 
     /**
@@ -304,13 +240,13 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        // if (session.status !== 'BELIEF_CAPTURED') {
-        //     return this.HandleError(
-        //         new BadRequestException(
-        //             `Cannot generate affirmation. Session must be in BELIEF_CAPTURED status. Current status: ${session.status}`,
-        //         ),
-        //     );
-        // }
+        if (session.status !== 'BELIEF_CAPTURED') {
+            return this.HandleError(
+                new BadRequestException(
+                    `Cannot generate affirmation. Session must be in BELIEF_CAPTURED status. Current status: ${session.status}`,
+                ),
+            );
+        }
 
         if (!session.rawBeliefText || session.rawBeliefText.trim().length === 0) {
             return this.HandleError(
@@ -319,12 +255,10 @@ export class ReflectionService extends BaseService {
         }
 
         try {
-            // Transform belief using NLP service
             const transformation = await this.nlpTransformationService.transformBelief(
                 session.rawBeliefText,
             );
 
-            // Generate TTS audio for affirmation
             let aiAffirmationAudioUrl: string | null = null;
             if (transformation.generatedAffirmation) {
                 try {
@@ -356,12 +290,6 @@ export class ReflectionService extends BaseService {
                 },
             });
 
-            // Add computed affirmationAudioUrl field
-            const sessionWithAudio = {
-                ...updatedSession,
-                affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
-            };
-
             // Send push notification for affirmation generated
             try {
                 const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
@@ -385,7 +313,7 @@ export class ReflectionService extends BaseService {
                 this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
             }
 
-            return this.Results(sessionWithAudio);
+            return this.Results(updatedSession);
         } catch (error) {
             // Log error but don't fail the request - transformation service handles fallbacks
             // If transformation fails, the service returns placeholder data
@@ -416,11 +344,6 @@ export class ReflectionService extends BaseService {
                 });
 
                 // Add computed affirmationAudioUrl field
-                const sessionWithAudio = {
-                    ...updatedSession,
-                    affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
-                };
-
                 // Send push notification for affirmation generated
                 try {
                     const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
@@ -444,7 +367,7 @@ export class ReflectionService extends BaseService {
                     this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
                 }
 
-                return this.Results(sessionWithAudio);
+                return this.Results(updatedSession);
             } catch (fallbackError) {
                 return this.HandleError(
                     new BadRequestException(
@@ -453,36 +376,6 @@ export class ReflectionService extends BaseService {
                 );
             }
         }
-    }
-
-    /**
-     * Generate prompt based on category name
-     */
-    private generatePrompt(categoryName: string): string {
-        // Check exact match first
-        if (this.PROMPT_MAPPING[categoryName]) {
-            return this.PROMPT_MAPPING[categoryName];
-        }
-
-        // Check partial matches (case-insensitive)
-        const normalizedName = categoryName.toLowerCase();
-        for (const [key, prompt] of Object.entries(this.PROMPT_MAPPING)) {
-            if (normalizedName.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedName)) {
-                return prompt;
-            }
-        }
-
-        // Default prompt if no match found
-        return `${categoryName} is...`;
-    }
-
-    /**
-     * Helper: Get user by Firebase ID
-     */
-    private async getUserByFirebaseId(firebaseId: string) {
-        return this.prisma.user.findUnique({
-            where: { firebaseId },
-        });
     }
 
     /**
@@ -524,20 +417,10 @@ export class ReflectionService extends BaseService {
         let audioUrl: string | undefined;
         let transcriptionText: string | undefined;
 
-        // Handle audio file upload and transcription
+        // Handle audio transcription
         if (audioFile) {
             try {
-                // Upload audio file
-                const uploadResult = await this.storageService.uploadFile(
-                    audioFile,
-                    FileType.AUDIO,
-                    user.id,
-                    'reflections',
-                );
-                audioUrl = uploadResult.url;
-
-                // Transcribe audio
-                transcriptionText = await this.transcriptionService.transcribeAudio(audioUrl);
+                transcriptionText = await this.transcriptionService.transcribeAudio(audioFile);
                 rawBeliefText = transcriptionText;
             } catch (error) {
                 return this.HandleError(
@@ -545,7 +428,6 @@ export class ReflectionService extends BaseService {
                 );
             }
         } else if (dto.text) {
-            // Use text input directly
             rawBeliefText = dto.text;
         } else {
             return this.HandleError(
@@ -553,7 +435,6 @@ export class ReflectionService extends BaseService {
             );
         }
 
-        // Determine new status - reset to BELIEF_CAPTURED if currently AFFIRMATION_GENERATED
         const newStatus = session.status === 'AFFIRMATION_GENERATED' ? 'BELIEF_CAPTURED' : session.status;
 
         // Update session with new belief
@@ -582,13 +463,7 @@ export class ReflectionService extends BaseService {
             },
         });
 
-        // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...updatedSession,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
-        };
-
-        return this.Results(sessionWithAudio);
+        return this.Results(updatedSession);
     }
 
     /**
@@ -649,13 +524,9 @@ export class ReflectionService extends BaseService {
                 },
             });
 
-            // Add computed affirmationAudioUrl field
-            const sessionWithAudio = {
-                ...updatedSession,
-                affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
-            };
+        
 
-            return this.Results(sessionWithAudio);
+            return this.Results(updatedSession);
         } catch (error) {
             return this.HandleError(
                 new BadRequestException(`Failed to upload audio file: ${error.message}`),
@@ -701,27 +572,9 @@ export class ReflectionService extends BaseService {
             },
         });
 
-        // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...updatedSession,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(updatedSession),
-        };
+        
 
-        return this.Results(sessionWithAudio);
-    }
-
-    /**
-     * Get the appropriate audio URL for affirmation playback
-     * Priority: userAffirmationAudioUrl > aiAffirmationAudioUrl
-     */
-    getAffirmationAudioUrl(session: any): string | null {
-        if (session.userAffirmationAudioUrl) {
-            return session.userAffirmationAudioUrl;
-        }
-        if (session.aiAffirmationAudioUrl) {
-            return session.aiAffirmationAudioUrl;
-        }
-        return null;
+        return this.Results(updatedSession);
     }
 
     /**
@@ -734,7 +587,6 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        // Validate session ownership
         const session = await this.prisma.reflectionSession.findFirst({
             where: {
                 id: dto.sessionId,
@@ -762,7 +614,6 @@ export class ReflectionService extends BaseService {
             );
         }
 
-        // Validate that session has an affirmation (required for waves)
         if (!session.approvedAffirmation && !session.generatedAffirmation) {
             return this.HandleError(
                 new BadRequestException(
@@ -771,7 +622,7 @@ export class ReflectionService extends BaseService {
             );
         }
 
-        const durationDays = dto.durationDays || 20; // Default to 20 days
+        const durationDays = dto.durationDays //|| 20; // Default to 20 days
         const startDate = new Date();
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + durationDays);
@@ -812,13 +663,8 @@ export class ReflectionService extends BaseService {
             },
         });
 
-        // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...sessionWithWave,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(sessionWithWave),
-        };
-
-        return this.Results(sessionWithAudio);
+      
+        return this.Results(sessionWithWave);
     }
 
     /**
@@ -916,13 +762,8 @@ export class ReflectionService extends BaseService {
             },
         });
 
-        // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...updatedWave.session,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(updatedWave.session),
-        };
-
-        return this.Results(sessionWithAudio);
+        
+        return this.Results(updatedWave);
     }
 
     /**
@@ -934,7 +775,6 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        // Find wave and validate ownership through session
         const wave = await this.prisma.wave.findFirst({
             where: {
                 id: waveId,
@@ -962,38 +802,7 @@ export class ReflectionService extends BaseService {
             where: { id: waveId },
         });
 
-        // Fetch session with updated waves for response
-        const session = await this.prisma.reflectionSession.findFirst({
-            where: {
-                id: wave.sessionId,
-                userId: user.id,
-            },
-            include: {
-                category: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
-                waves: {
-                    where: {
-                        isActive: true,
-                    },
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                    take: 1,
-                },
-            },
-        });
-
-        // Add computed affirmationAudioUrl field
-        const sessionWithAudio = {
-            ...session,
-            affirmationAudioUrl: this.getAffirmationAudioUrl(session),
-        };
-
-        return this.Results(sessionWithAudio);
+        return this.Results(null);
     }
 
     /**
@@ -1005,6 +814,34 @@ export class ReflectionService extends BaseService {
                 id: categoryId,
                 wheel: { userId },
             },
+        });
+    }
+
+      /**
+     * Generate prompt based on category name
+     */
+      private generatePrompt(categoryName: string): string {
+        if (this.PROMPT_MAPPING[categoryName]) {
+            return this.PROMPT_MAPPING[categoryName];
+        }
+
+        const normalizedName = categoryName.toLowerCase();
+        for (const [key, prompt] of Object.entries(this.PROMPT_MAPPING)) {
+            if (normalizedName.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedName)) {
+                return prompt;
+            }
+        }
+
+        // Default prompt if no match found
+        return `${categoryName} is...`;
+    }
+
+    /**
+     * Helper: Get user by Firebase ID
+     */
+    private async getUserByFirebaseId(firebaseId: string) {
+        return this.prisma.user.findUnique({
+            where: { firebaseId },
         });
     }
 }
