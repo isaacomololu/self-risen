@@ -28,7 +28,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { ReflectionService } from './reflection.service';
-import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -364,6 +364,58 @@ export class ReflectionController extends BaseController {
 
         return this.response({
             message: 'Playback tracked successfully',
+            data: result.data,
+        });
+    }
+
+    @Post('sessions/:sessionId/regenerate-voice')
+    @ApiOperation({
+        summary: 'Regenerate AI affirmation voice',
+        description: 'Regenerates the AI-generated affirmation audio. Optionally accepts a voice preference (MALE, FEMALE, ANDROGYNOUS). If not provided, uses the user\'s saved preference. Session must have a generated affirmation and be in AFFIRMATION_GENERATED or APPROVED status.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiBody({
+        type: RegenerateVoiceDto,
+        required: false,
+        description: 'Optional voice preference for regeneration',
+        examples: {
+            withPreference: {
+                summary: 'Regenerate with specific voice',
+                value: { voicePreference: 'FEMALE' }
+            },
+            useUserPreference: {
+                summary: 'Regenerate using user\'s saved preference',
+                value: {}
+            }
+        }
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmation voice regenerated successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Session not in correct status or missing affirmation',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Reflection session not found',
+    })
+    async regenerateAffirmationVoice(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+        @Body() dto?: RegenerateVoiceDto,
+    ) {
+        const result = await this.reflectionService.regenerateAffirmationVoice(user.uid, sessionId, dto);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Affirmation voice regenerated successfully',
             data: result.data,
         });
     }

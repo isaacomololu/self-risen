@@ -3,7 +3,7 @@ import { ConflictException, Injectable, NotFoundException, UnauthorizedException
 import { User } from '@prisma/client';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { BaseService, FileType, StorageService } from 'src/common';
-import { ChangeNameDto, ChangeUsernameDto } from './dto';
+import { ChangeNameDto, ChangeUsernameDto, ChangeTtsVoicePreferenceDto } from './dto';
 import { UploadAvatarDto } from './dto/upload-avatar.dto';
 import { config } from 'src/common';
 @Injectable()
@@ -167,5 +167,28 @@ export class UserService extends BaseService {
     };
 
     return this.Results(user);
+  }
+
+  async changeTtsVoicePreference(firebaseId: string, payload: ChangeTtsVoicePreferenceDto) {
+    const { ttsVoicePreference } = payload;
+
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId }
+    });
+
+    if (!user) {
+      return this.HandleError(
+        new NotFoundException('User not found')
+      )
+    };
+
+    const updatedUser = await this.prisma.user.update({
+      where: { firebaseId },
+      data: {
+        ttsVoicePreference,
+      }
+    })
+
+    return this.Results(updatedUser);
   }
 }

@@ -3,10 +3,20 @@ import { config, BaseService } from 'src/common';
 import { StorageService, FileType } from 'src/common/storage/storage.service';
 import OpenAI from 'openai';
 
+type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+type VoicePreference = 'male' | 'female' | 'androgynous';
+
 @Injectable()
 export class TextToSpeechService extends BaseService {
     private readonly logger = new Logger(TextToSpeechService.name);
     private openai: OpenAI;
+
+    // Voice mapping: preference -> OpenAI voice
+    private readonly VOICE_MAPPING: Record<VoicePreference, OpenAIVoice> = {
+        male: 'onyx',        // Deep, masculine voice
+        female: 'nova',       // Warm, feminine voice
+        androgynous: 'alloy', // Neutral, balanced voice
+    };
 
     constructor(private storageService: StorageService) {
         super();
@@ -17,14 +27,29 @@ export class TextToSpeechService extends BaseService {
     }
 
     /**
+     * Map voice preference enum to OpenAI voice
+     */
+    private getVoiceFromPreference(preference?: string | null): OpenAIVoice {
+        if (!preference) {
+            // Fallback to config or default
+            return (config.OPENAI_TTS_VOICE || 'alloy') as OpenAIVoice;
+        }
+        // Convert enum value (MALE/FEMALE/ANDROGYNOUS) to lowercase
+        const normalizedPreference = preference.toLowerCase() as VoicePreference;
+        return this.VOICE_MAPPING[normalizedPreference] || 'alloy';
+    }
+
+    /**
      * Generate audio from affirmation text using OpenAI TTS API
      * @param affirmationText - The affirmation text to convert to speech
      * @param userId - User ID for storage path
+     * @param voicePreference - Optional voice preference (MALE/FEMALE/ANDROGYNOUS enum value)
      * @returns Audio URL or null if generation fails
      */
     async generateAffirmationAudio(
         affirmationText: string,
         userId: string,
+        voicePreference?: string | null,
     ): Promise<string | null> {
         if (!affirmationText || affirmationText.trim().length === 0) {
             this.logger.warn('Empty affirmation text provided for TTS');
@@ -35,13 +60,7 @@ export class TextToSpeechService extends BaseService {
             this.logger.log(`Generating TTS audio for affirmation (${affirmationText.length} chars)`);
 
             const model = config.OPENAI_TTS_MODEL || 'tts-1';
-            const voice = (config.OPENAI_TTS_VOICE || 'alloy') as
-                | 'alloy'
-                | 'echo'
-                | 'fable'
-                | 'onyx'
-                | 'nova'
-                | 'shimmer';
+            const voice = this.getVoiceFromPreference(voicePreference);
 
             // Generate speech using OpenAI TTS API
             const response = await this.openai.audio.speech.create({

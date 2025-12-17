@@ -5,4 +5,5 @@ export { ReRecordBeliefDto } from './re-record-belief.dto';
 export { RecordAffirmationDto } from './record-affirmation.dto';
 export { CreateWaveDto } from './create-wave.dto';
 export { UpdateWaveDto } from './update-wave.dto';
+export { RegenerateVoiceDto } from './regenerate-voice.dto';
 

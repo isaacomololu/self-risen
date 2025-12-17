@@ -5,7 +5,7 @@ import { StorageService, FileType } from 'src/common/storage/storage.service';
 import { TranscriptionService } from './services/transcription.service';
 import { NlpTransformationService } from './services/nlp-transformation.service';
 import { TextToSpeechService } from './services/text-to-speech.service';
-import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto } from './dto';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
 import { NotificationTypeEnum, NotificationChannelTypeEnum } from 'src/notifications/enums/notification.enum';
 import { randomUUID } from 'crypto';
@@ -262,9 +262,13 @@ export class ReflectionService extends BaseService {
             let aiAffirmationAudioUrl: string | null = null;
             if (transformation.generatedAffirmation) {
                 try {
+                    // Get user's voice preference
+                    const voicePreference = user.ttsVoicePreference || null;
+
                     aiAffirmationAudioUrl = await this.textToSpeechService.generateAffirmationAudio(
                         transformation.generatedAffirmation,
                         user.id,
+                        voicePreference,
                     );
                 } catch (ttsError) {
                     this.logger.warn(`TTS generation failed: ${ttsError.message}. Continuing without audio.`);
@@ -803,6 +807,82 @@ export class ReflectionService extends BaseService {
         });
 
         return this.Results(null);
+    }
+
+    /**
+     * Regenerate AI affirmation audio with optional voice preference
+     * If voice preference is provided, uses it; otherwise uses user's saved preference
+     */
+    async regenerateAffirmationVoice(firebaseId: string, sessionId: string, dto?: RegenerateVoiceDto) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Validate session ownership and status
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        // Only regenerate if affirmation exists
+        if (!session.generatedAffirmation || session.generatedAffirmation.trim().length === 0) {
+            return this.HandleError(
+                new BadRequestException('Cannot regenerate voice. No generated affirmation found in session.'),
+            );
+        }
+
+        // Check if session has affirmation generated or approved
+        if (session.status !== 'AFFIRMATION_GENERATED' && session.status !== 'APPROVED') {
+            return this.HandleError(
+                new BadRequestException(
+                    `Cannot regenerate voice. Session must be in AFFIRMATION_GENERATED or APPROVED status. Current status: ${session.status}`,
+                ),
+            );
+        }
+
+        try {
+            // Use provided voice preference, or fall back to user's saved preference
+            const voicePreference = dto?.voicePreference || user.ttsVoicePreference || null;
+
+            // Regenerate audio with selected voice preference
+            const aiAffirmationAudioUrl = await this.textToSpeechService.generateAffirmationAudio(
+                session.generatedAffirmation,
+                user.id,
+                voicePreference,
+            );
+
+            // Update session with new audio URL
+            const updatedSession = await this.prisma.reflectionSession.update({
+                where: { id: sessionId },
+                data: {
+                    aiAffirmationAudioUrl,
+                },
+                include: {
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            });
+
+            this.logger.log(`Regenerated affirmation audio for session ${sessionId} with voice preference: ${voicePreference || 'default'}${dto?.voicePreference ? ' (override)' : ' (user preference)'}`);
+
+            return this.Results(updatedSession);
+        } catch (error) {
+            this.logger.error(`Error regenerating affirmation voice: ${error.message}`, error.stack);
+            return this.HandleError(
+                new BadRequestException(`Failed to regenerate affirmation voice: ${error.message}`),
+            );
+        }
     }
 
     /**

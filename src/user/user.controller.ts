@@ -5,7 +5,7 @@ import { AuthGuard, FirebaseUser } from 'src/common/';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { auth } from 'firebase-admin';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
-import { ChangeNameDto, ChangeUsernameDto, UploadAvatarDto } from './dto';
+import { ChangeNameDto, ChangeUsernameDto, UploadAvatarDto, ChangeTtsVoicePreferenceDto } from './dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @UseGuards(FirebaseGuard)
@@ -243,6 +243,42 @@ export class UserController extends BaseController {
     return this.response({
       message: 'Stats Retrived',
       data: stats.data,
+    })
+  }
+
+  @Patch('preferences/tts-voice')
+  @ApiOperation({
+    summary: 'Update TTS voice preference',
+    description: 'Updates the user\'s text-to-speech voice preference (MALE, FEMALE, or ANDROGYNOUS). This preference will be used for all future AI-generated affirmation audio.',
+  })
+  @ApiBody({
+    type: ChangeTtsVoicePreferenceDto,
+    examples: {
+      male: {
+        summary: 'Set voice to male',
+        value: { ttsVoicePreference: 'MALE' }
+      },
+      female: {
+        summary: 'Set voice to female',
+        value: { ttsVoicePreference: 'FEMALE' }
+      },
+      androgynous: {
+        summary: 'Set voice to androgynous',
+        value: { ttsVoicePreference: 'ANDROGYNOUS' }
+      }
+    }
+  })
+  async changeTtsVoicePreference(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @Body() form: ChangeTtsVoicePreferenceDto
+  ) {
+    const updatedUser = await this.userService.changeTtsVoicePreference(user.uid, form);
+
+    if (updatedUser.isError) throw updatedUser.error;
+
+    return this.response({
+      message: 'Voice preference updated',
+      data: updatedUser.data,
     })
   }
 }

@@ -27,6 +27,7 @@ model User {
   lastStreakDate     DateTime?
   lastLoggedInAt     DateTime?
   lastLoggedOutAt    DateTime?
+  ttsVoicePreference TtsVoicePreference? @default(ANDROGYNOUS)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   wheelOfLife        WheelOfLife?
@@ -301,4 +302,10 @@ enum ReflectionSessionStatus {
   AFFIRMATION_GENERATED
   APPROVED
   COMPLETED
+}
+
+enum TtsVoicePreference {
+  MALE
+  FEMALE
+  ANDROGYNOUS
 }
