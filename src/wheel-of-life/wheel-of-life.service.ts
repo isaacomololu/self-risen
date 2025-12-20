@@ -299,11 +299,15 @@ export class WheelOfLifeService extends BaseService {
     }
 
     async getFileUrls() {
-        const fileUrls = [
+        const light = [
             'https://kbvhivwhxphzvfxczguu.supabase.co/storage/v1/object/public/User/Videos/starts/shutterstock_3576412067.mov'
         ];
 
-        return this.Results(fileUrls);
+        const dark = [
+            'https://kbvhivwhxphzvfxczguu.supabase.co/storage/v1/object/public/User/Videos/starts/shutterstock_3576412067.mov'
+        ];
+
+        return this.Results({ light, dark });
     }
 
     private calculateBreakdown(
