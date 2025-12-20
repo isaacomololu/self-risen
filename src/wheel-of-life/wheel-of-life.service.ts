@@ -300,11 +300,17 @@ export class WheelOfLifeService extends BaseService {
 
     async getFileUrls() {
         const light = [
-            'https://kbvhivwhxphzvfxczguu.supabase.co/storage/v1/object/public/User/Videos/starts/shutterstock_3576412067.mov'
+            {
+                url: 'https://kbvhivwhxphzvfxczguu.supabase.co/storage/v1/object/public/User/Videos/starts/shutterstock_3576412067.mov',
+                name: 'ocean-view'
+            },
         ];
 
         const dark = [
-            'https://kbvhivwhxphzvfxczguu.supabase.co/storage/v1/object/public/User/Videos/starts/shutterstock_3576412067.mov'
+            {
+                url: 'https://kbvhivwhxphzvfxczguu.supabase.co/storage/v1/object/public/User/Videos/starts/shutterstock_3576412067.mov',
+                name: 'ocean-view'
+            }
         ];
 
         return this.Results({ light, dark });
