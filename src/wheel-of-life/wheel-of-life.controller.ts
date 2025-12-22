@@ -246,16 +246,5 @@ export class WheelOfLifeController extends BaseController {
             data: result.data,
         });
     }
-
-    @Get('files')
-    async getFileUrls() {
-        const result = await this.wheelService.getFileUrls();
-        if (result.isError) throw result.error;
-
-        return this.response({
-            message: 'File URLs retrieved',
-            data: result.data,
-        });
-    }
 }
 

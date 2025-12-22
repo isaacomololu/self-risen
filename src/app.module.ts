@@ -21,6 +21,7 @@ import { config } from './common';
 import { StreakInterceptor } from './common/interceptors/streak.interceptor';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { CommonModule } from './common/common.module';
+import { StaterVideosModule } from './stater-videos/stater-videos.module';
 
 @Module({
   imports: [
@@ -189,6 +190,7 @@ import { CommonModule } from './common/common.module';
     ReflectionModule,
     VisionBoardModule,
     JournalModule,
+    StaterVideosModule,
     // JwtModule.registerAsync({
     //   useFactory: () => ({
     //     secret: config.JWT_SECRET,
