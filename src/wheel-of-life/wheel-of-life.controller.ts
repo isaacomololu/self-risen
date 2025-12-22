@@ -246,5 +246,252 @@ export class WheelOfLifeController extends BaseController {
             data: result.data,
         });
     }
+
+    @Post('focus')
+    @ApiOperation({
+        summary: 'Choose a focus area',
+        description: 'Creates a new active focus for a specific category. Only one focus per category is allowed.',
+    })
+    @ApiBody({
+        type: ChooseFocusDto,
+        examples: {
+            chooseFocus: {
+                summary: 'Choose a category to focus on',
+                value: {
+                    categoryId: 'cat-id-6',
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Focus created successfully',
+        schema: {
+            example: {
+                message: 'Focus created',
+                data: {
+                    focus: {
+                        id: 'focus-id-123',
+                        wheelId: 'wheel-id-456',
+                        categoryId: 'cat-id-6',
+                        categoryName: 'Leisure & Fun',
+                        assessmentId: 'assessment-id-789',
+                        isActive: true,
+                        startedAt: '2024-01-20T16:30:00.000Z',
+                        createdAt: '2024-01-20T16:30:00.000Z',
+                        updatedAt: '2024-01-20T16:30:00.000Z',
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Focus already exists for this category',
+        schema: {
+            example: {
+                statusCode: 400,
+                message: 'Focus already exists',
+                error: 'Bad Request',
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Category not found',
+        schema: {
+            example: {
+                statusCode: 404,
+                message: 'Category not found',
+                error: 'Not Found',
+            },
+        },
+    })
+    async chooseFocus(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Body() payload: ChooseFocusDto,
+    ) {
+        const result = await this.wheelService.chooseFocus(user.uid, payload);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Focus created',
+            data: result.data,
+        });
+    }
+
+    @Get('focuses')
+    @ApiOperation({
+        summary: 'Get all focuses',
+        description: 'Retrieves all focuses for the user. Optionally filter by active status.',
+    })
+    @ApiQuery({
+        name: 'activeOnly',
+        required: false,
+        description: 'Filter focuses by active status. Use "true" for active only, "false" for inactive only, or omit for all.',
+        example: 'true',
+        type: String,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Focuses retrieved successfully',
+        schema: {
+            example: {
+                message: 'Focuses retrieved',
+                data: {
+                    focuses: [
+                        {
+                            id: 'focus-id-123',
+                            wheelId: 'wheel-id-456',
+                            categoryId: 'cat-id-6',
+                            category: {
+                                id: 'cat-id-6',
+                                name: 'Leisure & Fun',
+                                order: 5,
+                            },
+                            isActive: true,
+                            startedAt: '2024-01-20T16:30:00.000Z',
+                            completedAt: null,
+                            createdAt: '2024-01-20T16:30:00.000Z',
+                            updatedAt: '2024-01-20T16:30:00.000Z',
+                        },
+                        {
+                            id: 'focus-id-124',
+                            wheelId: 'wheel-id-456',
+                            categoryId: 'cat-id-2',
+                            category: {
+                                id: 'cat-id-2',
+                                name: 'Relationships',
+                                order: 1,
+                            },
+                            isActive: false,
+                            startedAt: '2024-01-15T10:00:00.000Z',
+                            completedAt: '2024-01-18T14:00:00.000Z',
+                            createdAt: '2024-01-15T10:00:00.000Z',
+                            updatedAt: '2024-01-18T14:00:00.000Z',
+                        },
+                    ],
+                    activeCount: 1,
+                    completedCount: 1,
+                },
+            },
+        },
+    })
+    async getFocuses(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Query('activeOnly') activeOnly?: string,
+    ) {
+        const activeOnlyBool = activeOnly === 'true' ? true : activeOnly === 'false' ? false : undefined;
+        const result = await this.wheelService.getFocuses(user.uid, activeOnlyBool);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Focuses retrieved',
+            data: result.data,
+        });
+    }
+
+    // @Patch('focuses/:focusId')
+    // @ApiOperation({
+    //     summary: 'Complete a focus',
+    //     description: 'Marks a focus as completed by setting isActive to false and recording the completion date.',
+    // })
+    // @ApiParam({
+    //     name: 'focusId',
+    //     description: 'The unique identifier of the focus to complete',
+    //     example: 'focus-id-123',
+    // })
+    // @ApiResponse({
+    //     status: 200,
+    //     description: 'Focus completed successfully',
+    //     schema: {
+    //         example: {
+    //             message: 'Focus updated',
+    //             data: {
+    //                 id: 'focus-id-123',
+    //                 wheelId: 'wheel-id-456',
+    //                 categoryId: 'cat-id-6',
+    //                 category: {
+    //                     id: 'cat-id-6',
+    //                     name: 'Leisure & Fun',
+    //                     order: 5,
+    //                 },
+    //                 isActive: false,
+    //                 startedAt: '2024-01-20T16:30:00.000Z',
+    //                 completedAt: '2024-01-25T10:00:00.000Z',
+    //                 createdAt: '2024-01-20T16:30:00.000Z',
+    //                 updatedAt: '2024-01-25T10:00:00.000Z',
+    //             },
+    //         },
+    //     },
+    // })
+    // @ApiResponse({
+    //     status: 404,
+    //     description: 'Focus not found',
+    //     schema: {
+    //         example: {
+    //             statusCode: 404,
+    //             message: 'Focus not found',
+    //             error: 'Not Found',
+    //         },
+    //     },
+    // })
+    // async completeFocus(
+    //     @FirebaseUser() user: auth.DecodedIdToken,
+    //     @Param('focusId') focusId: string,
+    // ) {
+    //     const result = await this.wheelService.completeFocus(user.uid, focusId);
+    //     if (result.isError) throw result.error;
+
+    //     return this.response({
+    //         message: 'Focus updated',
+    //         data: result.data,
+    //     });
+    // }
+
+    @Delete('focuses/:focusId')
+    @ApiOperation({
+        summary: 'Delete a focus',
+        description: 'Permanently deletes a focus from the Wheel of Life.',
+    })
+    @ApiParam({
+        name: 'focusId',
+        description: 'The unique identifier of the focus to delete',
+        example: 'focus-id-123',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Focus deleted successfully',
+        schema: {
+            example: {
+                message: 'Focus deleted',
+                data: null,
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Focus not found',
+        schema: {
+            example: {
+                statusCode: 404,
+                message: 'Focus not found',
+                error: 'Not Found',
+            },
+        },
+    })
+    async deleteFocus(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('focusId') focusId: string,
+    ) {
+        const result = await this.wheelService.deleteFocus(user.uid, focusId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Focus deleted',
+            data: result.data,
+        });
+    }
+
 }
 
