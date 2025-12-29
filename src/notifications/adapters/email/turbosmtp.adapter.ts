@@ -24,18 +24,26 @@ export class TurboSMTPAdapter extends IEmailChannelAdapter {
     if (port && user && password) {
       // SSL ports: 465, 25025 | non-SSL ports: 25, 587, 2525
       const securePorts = [465, 25025];
+      const isSecure = securePorts.includes(port);
       this.transporter = createTransport({
         host,
         port,
-        secure: securePorts.includes(port), // SSL for ports 465 and 25025
+        secure: isSecure, // SSL for ports 465 and 25025
         auth: {
           user,
           pass: password,
         },
+        // Enable STARTTLS for non-secure ports (587, 2525, 25)
+        ...(!isSecure && {
+          requireTLS: true,
+          tls: {
+            rejectUnauthorized: false, // Accept self-signed certificates if needed
+          },
+        }),
         // Timeout configurations to prevent hanging in production
-        connectionTimeout: 10000, // 10 seconds to establish connection
-        socketTimeout: 30000, // 30 seconds for socket operations
-        greetingTimeout: 10000, // 10 seconds for SMTP greeting
+        connectionTimeout: 30000, // 30 seconds to establish connection
+        socketTimeout: 60000, // 60 seconds for socket operations
+        greetingTimeout: 30000, // 30 seconds for SMTP greeting
         // Pool connections for better performance
         pool: true,
         maxConnections: 5,
@@ -64,18 +72,26 @@ export class TurboSMTPAdapter extends IEmailChannelAdapter {
       // Re-initialize transporter if not initialized or credentials changed
       // SSL ports: 465, 25025 | non-SSL ports: 25, 587, 2525
       const securePorts = [465, 25025];
+      const isSecure = securePorts.includes(port);
       if (!this.transporter) {
         this.transporter = createTransport({
           host,
           port,
-          secure: securePorts.includes(port), // SSL for ports 465 and 25025
+          secure: isSecure, // SSL for ports 465 and 25025
           auth: {
             user,
             pass: password,
           },
-          connectionTimeout: 10000,
-          socketTimeout: 30000,
-          greetingTimeout: 10000,
+          // Enable STARTTLS for non-secure ports (587, 2525, 25)
+          ...(!isSecure && {
+            requireTLS: true,
+            tls: {
+              rejectUnauthorized: false,
+            },
+          }),
+          connectionTimeout: 30000,
+          socketTimeout: 60000,
+          greetingTimeout: 30000,
           pool: true,
           maxConnections: 5,
           maxMessages: 100,
