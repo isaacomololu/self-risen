@@ -29,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { VisionBoardService } from './vision-board.service';
-import { AddVisionDto, UpdateVisionDto } from './dto';
+import { AddVisionDto, UpdateVisionDto, ReorderVisionDto, ReorderSoundDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -52,6 +52,11 @@ export class VisionBoardController extends BaseController {
         schema: {
             type: 'object',
             properties: {
+                visionBoardId: {
+                    type: 'string',
+                    description: 'The ID of the vision board to add the vision to (required)',
+                    example: 'vision-board-id-123',
+                },
                 reflectionSessionId: {
                     type: 'string',
                     description: 'The ID of the reflection session to add (optional)',
@@ -63,7 +68,7 @@ export class VisionBoardController extends BaseController {
                     description: 'Image file to display with the vision (optional)',
                 },
             },
-            required: [],
+            required: ['visionBoardId'],
         },
     })
     @ApiResponse({
@@ -85,6 +90,7 @@ export class VisionBoardController extends BaseController {
     ) {
         const result = await this.visionBoardService.addVision(
             user.uid,
+            dto.visionBoardId,
             dto.reflectionSessionId,
             imageFile,
         );
@@ -99,7 +105,7 @@ export class VisionBoardController extends BaseController {
     @Get('visions')
     @ApiOperation({
         summary: 'Get all visions for user\'s vision board',
-        description: 'Retrieves a paginated list of all visions in the user\'s vision board.',
+        description: 'Retrieves a paginated list of all visions in the user\'s vision board. Can be filtered by visionBoardId.',
     })
     @ApiQuery({
         name: 'page',
@@ -115,6 +121,13 @@ export class VisionBoardController extends BaseController {
         description: 'Number of items per page (default: 10, max: 100)',
         example: 10,
     })
+    @ApiQuery({
+        name: 'visionBoardId',
+        required: false,
+        type: String,
+        description: 'Filter visions by vision board ID (optional - if not provided, returns visions from all user\'s vision boards)',
+        example: 'vision-board-id-123',
+    })
     @ApiResponse({
         status: 200,
         description: 'Visions retrieved successfully',
@@ -127,6 +140,7 @@ export class VisionBoardController extends BaseController {
         @FirebaseUser() user: auth.DecodedIdToken,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
+        @Query('visionBoardId') visionBoardId?: string,
     ) {
         const pageNumber = page ? parseInt(page, 10) : 1;
         const limitNumber = limit ? parseInt(limit, 10) : 10;
@@ -135,6 +149,7 @@ export class VisionBoardController extends BaseController {
             user.uid,
             pageNumber,
             limitNumber,
+            visionBoardId,
         );
         if (result.isError) throw result.error;
 
@@ -389,6 +404,163 @@ export class VisionBoardController extends BaseController {
 
         return this.response({
             message: 'Audio files retrieved successfully',
+            data: result.data,
+        });
+    }
+
+    @Patch('visions/:id/reorder')
+    @ApiOperation({
+        summary: 'Reorder a vision within its vision board',
+        description: 'Changes the order of a vision within its vision board. Other visions are shifted accordingly.',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'The unique identifier of the vision to reorder',
+        example: 'vision-id-123',
+    })
+    @ApiBody({ type: ReorderVisionDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Vision reordered successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                message: { type: 'string' },
+                visions: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            order: { type: 'number' },
+                        },
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Vision not found',
+    })
+    async reorderVision(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('id') visionId: string,
+        @Body() dto: ReorderVisionDto,
+    ) {
+        const result = await this.visionBoardService.reorderVision(
+            user.uid,
+            visionId,
+            dto.newOrder,
+        );
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Vision reordered successfully',
+            data: result.data,
+        });
+    }
+
+    @Patch('sounds/:id/reorder')
+    @ApiOperation({
+        summary: 'Reorder a sound',
+        description: 'Changes the order of a sound. Other sounds are shifted accordingly.',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'The unique identifier of the sound to reorder',
+        example: 'sound-id-123',
+    })
+    @ApiBody({ type: ReorderSoundDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Sound reordered successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                message: { type: 'string' },
+                sounds: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            order: { type: 'number' },
+                            fileName: { type: 'string', nullable: true },
+                        },
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Sound not found',
+    })
+    async reorderSound(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('id') soundId: string,
+        @Body() dto: ReorderSoundDto,
+    ) {
+        const result = await this.visionBoardService.reorderSound(
+            user.uid,
+            soundId,
+            dto.newOrder,
+        );
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Sound reordered successfully',
+            data: result.data,
+        });
+    }
+
+    @Get('boards')
+    @ApiOperation({
+        summary: 'Get all vision boards for user',
+        description: 'Retrieves all vision boards for the authenticated user, including associated category information and vision counts.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Vision boards retrieved successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                count: { type: 'number', description: 'Total number of vision boards' },
+                boards: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string', description: 'Vision board ID' },
+                            categoryId: { type: 'string', description: 'Associated category ID' },
+                            category: {
+                                type: 'object',
+                                properties: {
+                                    id: { type: 'string' },
+                                    name: { type: 'string' },
+                                    order: { type: 'number' },
+                                },
+                            },
+                            visionCount: { type: 'number', description: 'Number of visions in this board' },
+                            createdAt: { type: 'string', format: 'date-time' },
+                            updatedAt: { type: 'string', format: 'date-time' },
+                        },
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User not found',
+    })
+    async getAllVisionBoards(@FirebaseUser() user: auth.DecodedIdToken) {
+        const result = await this.visionBoardService.getAllVisionBoards(user.uid);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Vision boards retrieved successfully',
             data: result.data,
         });
     }

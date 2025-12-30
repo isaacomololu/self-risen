@@ -11,8 +11,6 @@ import { AuditLogRepository } from './repositories/audit-log.repository';
 import { DeadLetterQueueRepository } from './repositories/dead-letter-queue.repository';
 import { MailgunAdapter } from './adapters/email/mailgun.adapter';
 import { GmailAdapter } from './adapters/email/gmail.adapter';
-import { TurboSMTPAdapter } from './adapters/email/turbosmtp.adapter';
-import { SendplusAdapter } from './adapters/email/sendplus.adapter';
 import { TwilioAdapter } from './adapters/sms/twilio.adapter';
 import { FirebaseAdapter } from './adapters/push/firebase.adapter';
 import { INotificationService } from './interfaces/notification.interface';
@@ -71,8 +69,6 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
     // Adapters
     MailgunAdapter,
     GmailAdapter,
-    TurboSMTPAdapter,
-    SendplusAdapter,
     TwilioAdapter,
     FirebaseAdapter,
 
@@ -82,15 +78,13 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
       useFactory: (
         mailgun: MailgunAdapter,
         gmail: GmailAdapter,
-        turbosmtp: TurboSMTPAdapter,
-        sendplus: SendplusAdapter,
         twilio: TwilioAdapter,
         firebase: FirebaseAdapter,
         configService: ConfigService,
       ) => {
         const map = new Map();
 
-        // Email adapters priority: TurboSMTP > Gmail > Mailgun > Sendplus
+        // Email adapters priority: Gmail > Mailgun
         const emailAdapters: IEmailChannelAdapter[] = [];
         const hasGmailConfig =
           configService.get<string>('MAIL_USERNAME') &&
@@ -103,27 +97,11 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
           configService.get<string>('MAILGUN_DOMAIN') &&
           configService.get<string>('MAILGUN_FROM_EMAIL');
 
-        const hasTurboSMTPConfig =
-          configService.get<number>('TURBOSMTP_PORT') &&
-          configService.get<string>('TURBOSMTP_USER') &&
-          configService.get<string>('TURBOSMTP_PASSWORD');
-
-        const hasSendplusConfig =
-          configService.get<string>('SENDPLUS_API_KEY') &&
-          configService.get<string>('SENDPLUS_FROM_EMAIL');
-
-        // TurboSMTP is the primary email adapter
-        if (hasTurboSMTPConfig) {
-          emailAdapters.push(turbosmtp);
-        }
         if (hasGmailConfig) {
           emailAdapters.push(gmail);
         }
         if (hasMailgunConfig) {
           emailAdapters.push(mailgun);
-        }
-        if (hasSendplusConfig) {
-          emailAdapters.push(sendplus);
         }
 
         // Default to Gmail if no adapters configured (will fail gracefully)
@@ -139,8 +117,6 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
       inject: [
         MailgunAdapter,
         GmailAdapter,
-        TurboSMTPAdapter,
-        SendplusAdapter,
         TwilioAdapter,
         FirebaseAdapter,
         ConfigService,

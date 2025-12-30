@@ -65,6 +65,11 @@ export class WheelOfLifeService extends BaseService {
                     create: this.DEFAULT_CATEGORIES.map((name, index) => ({
                         name,
                         order: index,
+                        visionBoard: {
+                            create: {
+                                userId: user.id,
+                            },
+                        },
                     })),
                 },
             },
@@ -126,6 +131,11 @@ export class WheelOfLifeService extends BaseService {
                 wheelId: wheel.id,
                 name: payload.name,
                 order: payload.order ?? (maxOrderCategory?.order ?? -1) + 1,
+                visionBoard: {
+                    create: {
+                        userId: user.id,
+                    },
+                },
             },
         });
 

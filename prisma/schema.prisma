@@ -32,7 +32,7 @@ model User {
   updatedAt          DateTime            @updatedAt
   wheelOfLife        WheelOfLife?
   reflectionSessions ReflectionSession[]
-  visions            Vision[]
+  visionBoards       VisionBoard[]
   journals           Journal[]
 }
 
@@ -148,6 +148,7 @@ model WheelCategory {
   order              Int
   focuses            WheelFocus[]
   reflectionSessions ReflectionSession[]
+  visionBoard        VisionBoard?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -240,10 +241,24 @@ model Wave {
   @@index([endDate, isActive])
 }
 
+model VisionBoard {
+  id         String        @id @default(uuid())
+  categoryId String        @unique
+  category   WheelCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visions    Vision[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([categoryId])
+  @@index([userId])
+}
+
 model Vision {
   id                  String             @id @default(uuid())
-  userId              String
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visionBoardId       String
+  visionBoard         VisionBoard        @relation(fields: [visionBoardId], references: [id], onDelete: Cascade)
   reflectionSessionId String?            @unique
   reflectionSession   ReflectionSession? @relation(fields: [reflectionSessionId], references: [id], onDelete: Cascade)
   imageUrl            String?
@@ -251,9 +266,9 @@ model Vision {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  @@index([userId])
+  @@index([visionBoardId])
   @@index([reflectionSessionId])
-  @@index([userId, order])
+  @@index([visionBoardId, order])
 }
 
 model Journal {
