@@ -95,6 +95,9 @@ importers:
       nanoid:
         specifier: 3.3.7
         version: 3.3.7
+      node-mailjet:
+        specifier: ^6.0.11
+        version: 6.0.11
       nodemailer:
         specifier: ^6.10.0
         version: 6.10.1
@@ -3441,6 +3444,10 @@ packages:
 
   node-int64@0.4.0:
     resolution: {integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==}
+
+  node-mailjet@6.0.11:
+    resolution: {integrity: sha512-5UaawWhpJc1uFxUl9a07jE8a4ZOax5hj7XYC0LFYyWOP8Rp0I8XvjbiQ6gy/ns7KSw0hqmjytP85GQsdVGEx5g==}
+    engines: {node: '>= 12.0.0', npm: '>= 6.9.0'}
 
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
@@ -8399,6 +8406,14 @@ snapshots:
     optional: true
 
   node-int64@0.4.0: {}
+
+  node-mailjet@6.0.11:
+    dependencies:
+      axios: 1.13.2
+      json-bigint: 1.0.0
+      url-join: 4.0.1
+    transitivePeerDependencies:
+      - debug
 
   node-releases@2.0.27: {}
 

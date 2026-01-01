@@ -50,6 +50,7 @@
     "isomorphic-dompurify": "^2.10.0",
     "mailgun.js": "^9.4.1",
     "nanoid": "3.3.7",
+    "node-mailjet": "^6.0.11",
     "nodemailer": "^6.10.0",
     "openai": "^6.9.1",
     "passport": "^0.7.0",

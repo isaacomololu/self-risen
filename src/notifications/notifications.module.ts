@@ -11,6 +11,7 @@ import { AuditLogRepository } from './repositories/audit-log.repository';
 import { DeadLetterQueueRepository } from './repositories/dead-letter-queue.repository';
 import { MailgunAdapter } from './adapters/email/mailgun.adapter';
 import { GmailAdapter } from './adapters/email/gmail.adapter';
+import { MailjetAdapter } from './adapters/email/mailjet.adapter';
 import { TwilioAdapter } from './adapters/sms/twilio.adapter';
 import { FirebaseAdapter } from './adapters/push/firebase.adapter';
 import { INotificationService } from './interfaces/notification.interface';
@@ -69,6 +70,7 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
     // Adapters
     MailgunAdapter,
     GmailAdapter,
+    MailjetAdapter,
     TwilioAdapter,
     FirebaseAdapter,
 
@@ -78,14 +80,20 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
       useFactory: (
         mailgun: MailgunAdapter,
         gmail: GmailAdapter,
+        mailjet: MailjetAdapter,
         twilio: TwilioAdapter,
         firebase: FirebaseAdapter,
         configService: ConfigService,
       ) => {
         const map = new Map();
 
-        // Email adapters priority: Gmail > Mailgun
+        // Email adapters priority: Mailjet > Gmail > Mailgun
         const emailAdapters: IEmailChannelAdapter[] = [];
+        const hasMailjetConfig =
+          configService.get<string>('MAILJET_API_KEY') &&
+          configService.get<string>('MAILJET_SECRET_KEY') &&
+          configService.get<string>('MAILJET_FROM_EMAIL');
+
         const hasGmailConfig =
           configService.get<string>('MAIL_USERNAME') &&
           configService.get<string>('OAUTH_CLIENTID') &&
@@ -97,6 +105,9 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
           configService.get<string>('MAILGUN_DOMAIN') &&
           configService.get<string>('MAILGUN_FROM_EMAIL');
 
+        if (hasMailjetConfig) {
+          emailAdapters.push(mailjet);
+        }
         if (hasGmailConfig) {
           emailAdapters.push(gmail);
         }
@@ -104,9 +115,9 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
           emailAdapters.push(mailgun);
         }
 
-        // Default to Gmail if no adapters configured (will fail gracefully)
+        // Default to Mailjet if no adapters configured (will fail gracefully)
         if (emailAdapters.length === 0) {
-          emailAdapters.push(gmail);
+          emailAdapters.push(mailjet);
         }
 
         map.set(NotificationChannelTypeEnum.EMAIL, emailAdapters);
@@ -117,6 +128,7 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
       inject: [
         MailgunAdapter,
         GmailAdapter,
+        MailjetAdapter,
         TwilioAdapter,
         FirebaseAdapter,
         ConfigService,
