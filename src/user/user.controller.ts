@@ -1,18 +1,22 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UploadedFile, UseInterceptors, BadRequestException, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 import { BaseController } from 'src/common';
 import { AuthGuard, FirebaseUser } from 'src/common/';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiBody, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { auth } from 'firebase-admin';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
-import { ChangeNameDto, ChangeUsernameDto, UploadAvatarDto, ChangeTtsVoicePreferenceDto } from './dto';
+import { ChangeNameDto, ChangeUsernameDto, UploadAvatarDto, ChangeTtsVoicePreferenceDto, StreakCalendarQueryDto, StreakChartQueryDto } from './dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { StreakService } from 'src/common/services/streak.service';
 
 @UseGuards(FirebaseGuard)
 @ApiBearerAuth('firebase')
 @Controller('user')
 export class UserController extends BaseController {
-  constructor(private readonly userService: UserService) {
+  constructor(
+    private readonly userService: UserService,
+    private readonly streakService: StreakService,
+  ) {
     super();
   }
 
@@ -244,6 +248,111 @@ export class UserController extends BaseController {
       message: 'Stats Retrived',
       data: stats.data,
     })
+  }
+
+  @Get('stats/streak-calendar')
+  @ApiOperation({
+    summary: 'Get streak calendar data',
+    description: 'Returns streak activity data for a specific month/year to render a calendar view showing active days.',
+  })
+  @ApiQuery({ name: 'year', type: Number, required: true, example: 2024 })
+  @ApiQuery({ name: 'month', type: Number, required: true, example: 1, description: 'Month (1-12)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Streak calendar data retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Streak calendar retrieved' },
+        data: {
+          type: 'object',
+          properties: {
+            year: { type: 'number', example: 2024 },
+            month: { type: 'number', example: 1 },
+            totalActiveDays: { type: 'number', example: 15 },
+            days: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  date: { type: 'string', example: '2024-01-15' },
+                  dayOfMonth: { type: 'number', example: 15 },
+                  streak: { type: 'number', example: 10 },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  async getStreakCalendar(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @Query() query: StreakCalendarQueryDto,
+  ) {
+    const dbUser = await this.userService.getUserProfile(user.uid);
+    if (dbUser.isError) throw dbUser.error;
+
+    const calendarData = await this.streakService.getStreakCalendar(
+      dbUser.data.id,
+      query.year,
+      query.month,
+    );
+
+    return this.response({
+      message: 'Streak calendar retrieved',
+      data: calendarData,
+    });
+  }
+
+  @Get('stats/streak-chart')
+  @ApiOperation({
+    summary: 'Get streak chart data',
+    description: 'Returns streak days per month for a given year (defaults to current year) to render a bar chart.',
+  })
+  @ApiQuery({ name: 'year', type: Number, required: false, example: 2024, description: 'Year (defaults to current year)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Streak chart data retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Streak chart retrieved' },
+        data: {
+          type: 'object',
+          properties: {
+            year: { type: 'number', example: 2024 },
+            totalStreakDays: { type: 'number', example: 180 },
+            months: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  month: { type: 'string', example: 'January' },
+                  monthNumber: { type: 'number', example: 1 },
+                  streakDays: { type: 'number', example: 15 },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  async getStreakChart(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @Query() query: StreakChartQueryDto,
+  ) {
+    const dbUser = await this.userService.getUserProfile(user.uid);
+    if (dbUser.isError) throw dbUser.error;
+
+    const year = query.year || new Date().getFullYear();
+    const chartData = await this.streakService.getStreakChart(dbUser.data.id, year);
+
+    return this.response({
+      message: 'Streak chart retrieved',
+      data: chartData,
+    });
   }
 
   @Patch('preferences/tts-voice')

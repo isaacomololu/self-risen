@@ -4,10 +4,20 @@ import { DatabaseProvider } from "src/database/database.provider";
 import { INotificationService } from "src/notifications/interfaces/notification.interface";
 import { NotificationTypeEnum, NotificationChannelTypeEnum } from "src/notifications/enums/notification.enum";
 import { randomUUID } from "crypto";
+import {
+    StreakCalendarResponse,
+    StreakChartResponse,
+    StreakChartMonth
+} from "src/user/dto/streak-visualization.dto";
 
 @Injectable()
 export class StreakService {
     private readonly logger = new Logger(StreakService.name);
+
+    private readonly MONTH_NAMES = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
 
     constructor(
         private prisma: DatabaseProvider,
@@ -20,26 +30,15 @@ export class StreakService {
         const lastStreakDate = user.lastStreakDate ?
             new Date(user.lastStreakDate.getFullYear(), user.lastStreakDate.getMonth(), user.lastStreakDate.getDate()) : null;
 
-
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
 
         let streak = user.streak;
+        let shouldRecordHistory = false;
+
         if (!lastStreakDate) {
             streak = 1;
-            const lastStreakAt = today;
-            await this.prisma.user.update({
-                where: { id: user.id },
-                data: {
-                    streak,
-                    lastStreakDate: lastStreakAt,
-                }
-            });
-            return;
-        }
-
-        else if (lastStreakDate.getTime() === yesterday.getTime()) {
-            streak = user.streak + 1;
+            shouldRecordHistory = true;
             await this.prisma.user.update({
                 where: { id: user.id },
                 data: {
@@ -47,7 +46,17 @@ export class StreakService {
                     lastStreakDate: today,
                 }
             });
-            
+        } else if (lastStreakDate.getTime() === yesterday.getTime()) {
+            streak = user.streak + 1;
+            shouldRecordHistory = true;
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    streak,
+                    lastStreakDate: today,
+                }
+            });
+
             // Check if streak is a milestone and send notification
             if (this.isStreakMilestone(streak)) {
                 try {
@@ -70,16 +79,13 @@ export class StreakService {
                     this.logger.warn(`Failed to send streak milestone notification: ${notificationError.message}`);
                 }
             }
-            
+        } else if (lastStreakDate.getTime() === today.getTime()) {
+            // Already logged in today - no update needed
             return;
-        }
-
-        else if (lastStreakDate.getTime() === today.getTime()) {
-            return;
-        }
-
-        else {
+        } else {
+            // Streak broken - reset to 1
             streak = 1;
+            shouldRecordHistory = true;
             await this.prisma.user.update({
                 where: { id: user.id },
                 data: {
@@ -87,8 +93,114 @@ export class StreakService {
                     lastStreakDate: today,
                 }
             });
-            return;
         }
+
+        // Record streak history if activity occurred
+        if (shouldRecordHistory) {
+            await this.recordStreakHistory(user.id, today, streak);
+        }
+    }
+
+    private async recordStreakHistory(userId: string, date: Date, streak: number): Promise<void> {
+        try {
+            await this.prisma.streakHistory.upsert({
+                where: {
+                    userId_date: {
+                        userId,
+                        date,
+                    },
+                },
+                update: {
+                    streak,
+                },
+                create: {
+                    userId,
+                    date,
+                    streak,
+                },
+            });
+        } catch (error) {
+            this.logger.error(`Failed to record streak history: ${error.message}`);
+        }
+    }
+
+    async getStreakCalendar(userId: string, year: number, month: number): Promise<StreakCalendarResponse> {
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+        endDate.setHours(23, 59, 59, 999);
+
+        const streakHistory = await this.prisma.streakHistory.findMany({
+            where: {
+                userId,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            orderBy: {
+                date: 'asc',
+            },
+        });
+
+        const days = streakHistory.map(record => ({
+            date: record.date.toISOString().split('T')[0],
+            dayOfMonth: record.date.getDate(),
+            streak: record.streak,
+        }));
+
+        return {
+            year,
+            month,
+            totalActiveDays: days.length,
+            days,
+        };
+    }
+
+    async getStreakChart(userId: string, year: number): Promise<StreakChartResponse> {
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+
+        const streakHistory = await this.prisma.streakHistory.findMany({
+            where: {
+                userId,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            select: {
+                date: true,
+            },
+        });
+
+        const monthCounts = new Map<number, number>();
+        for (let i = 1; i <= 12; i++) {
+            monthCounts.set(i, 0);
+        }
+
+        for (const record of streakHistory) {
+            const monthNumber = record.date.getMonth() + 1;
+            monthCounts.set(monthNumber, (monthCounts.get(monthNumber) || 0) + 1);
+        }
+
+        const months: StreakChartMonth[] = [];
+        let totalStreakDays = 0;
+
+        for (let i = 1; i <= 12; i++) {
+            const streakDays = monthCounts.get(i) || 0;
+            totalStreakDays += streakDays;
+            months.push({
+                month: this.MONTH_NAMES[i - 1],
+                monthNumber: i,
+                streakDays,
+            });
+        }
+
+        return {
+            year,
+            totalStreakDays,
+            months,
+        };
     }
 
     /**

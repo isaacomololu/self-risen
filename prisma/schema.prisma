@@ -34,6 +34,20 @@ model User {
   reflectionSessions ReflectionSession[]
   visionBoards       VisionBoard[]
   journals           Journal[]
+  streakHistory      StreakHistory[]
+}
+
+model StreakHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  streak    Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([userId, date])
 }
 
 model Notification {

@@ -37,6 +37,7 @@
     "@nestjs/websockets": "^11.0.16",
     "@prisma/client": "^6.3.0",
     "@supabase/supabase-js": "^2.81.1",
+    "@types/passport-facebook": "^3.0.4",
     "bcryptjs": "^3.0.2",
     "bull": "^4.12.2",
     "cache-manager": "^5.7.6",
@@ -54,6 +55,7 @@
     "nodemailer": "^6.10.0",
     "openai": "^6.9.1",
     "passport": "^0.7.0",
+    "passport-facebook": "^3.0.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "prisma": "^6.3.0",
@@ -99,12 +101,24 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "diagnostics": {
+            "ignoreCodes": [
+              151002
+            ]
+          }
+        }
+      ]
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }

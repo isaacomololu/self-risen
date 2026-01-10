@@ -1,9 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException} from '@nestjs/common';
 import { BaseService } from 'src/common';
+import { DatabaseProvider } from 'src/database/database.provider';
+
+
 
 @Injectable()
 export class StaterVideosService extends BaseService{
-    constructor() {
+        constructor(private prisma: DatabaseProvider) {
         super();
     }
 
@@ -51,5 +54,55 @@ export class StaterVideosService extends BaseService{
         ];
 
         return this.Results({ light, dark });
+    }
+
+    async getAllSessions(
+        page: number = 1,
+        limit: number = 10,
+    ) {
+        const pageNumber = Math.max(1, Math.floor(page));
+        const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
+        const skip = (pageNumber - 1) * pageSize;
+
+        const whereClause = { userId: '51c20a08-c95e-4673-854a-8ed327997681' };
+
+        const totalCount = await this.prisma.reflectionSession.count({
+            where: whereClause,
+        });
+
+        const sessions = await this.prisma.reflectionSession.findMany({
+            where: whereClause,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: pageSize,
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        const totalPages = Math.ceil(totalCount / pageSize);
+
+        return this.Results({
+            data: sessions,
+            pagination: {
+                page: pageNumber,
+                limit: pageSize,
+                total: totalCount,
+                totalPages,
+                hasNextPage: pageNumber < totalPages,
+                hasPreviousPage: pageNumber > 1,
+            },
+        });
+    }
+
+    private async getUserByFirebaseId(firebaseId: string) {
+        return this.prisma.user.findUnique({
+            where: { firebaseId },
+        });
     }
 }
