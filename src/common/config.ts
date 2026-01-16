@@ -92,7 +92,10 @@ class Config {
     @IsString()
     FIREBASE_STORAGE_BUCKET: string;
 
-    // Supabase Configuration (optional, required only when using Supabase)
+    @IsNotEmpty()
+    @IsString()
+    APPLE_CLIENT_ID: string;
+
     @IsString()
     SUPABASE_URL?: string;
 
