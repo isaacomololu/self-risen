@@ -5,7 +5,8 @@
       "Bash(pnpm run build:*)",
       "Bash(pnpm jest:*)",
       "Bash(ls -la \"c:\\\\Users\\\\Isaac\\\\Documents\\\\Work\\\\self-risen\\\\src\\\\vision-board\"\" 2>/dev/null || dir \"c:UsersIsaacDocumentsWorkself-risensrcvision-board \")",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

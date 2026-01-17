@@ -1,5 +1,5 @@
-import { plainToInstance } from "class-transformer";
-import { IsNotEmpty, IsString, validate } from "class-validator";
+import { plainToInstance, Type } from "class-transformer";
+import { IsNotEmpty, IsNumber, IsString, validate } from "class-validator";
 
 class Config {
     @IsNotEmpty()
@@ -19,6 +19,8 @@ class Config {
     JWT_EXPIRATION: string;
 
     @IsNotEmpty()
+    @IsNumber()
+    @Type(() => Number)
     PORT: number;
 
     @IsNotEmpty()
@@ -92,31 +94,48 @@ class Config {
     @IsString()
     FIREBASE_STORAGE_BUCKET: string;
 
+    // Apple Sign-In Configuration
+    // APPLE_CLIENT_ID: Services ID for web-based Apple Sign-In (required)
+    // APPLE_BUNDLE_ID: Bundle ID for native iOS/macOS apps (optional, only needed if supporting mobile)
     @IsNotEmpty()
     @IsString()
     APPLE_CLIENT_ID: string;
 
+    // @IsNotEmpty()
+    // @IsString()
+    // APPLE_BUNDLE_ID?: string;
+
+    @IsNotEmpty()
     @IsString()
     SUPABASE_URL?: string;
 
+    @IsNotEmpty()
     @IsString()
     SUPABASE_SERVICE_ROLE_KEY?: string;
 
+    @IsNotEmpty()
     @IsString()
     SUPABASE_STORAGE_BUCKET?: string;
 
     // Storage Provider Selection (optional, defaults to 'firebase')
+    @IsNotEmpty()
+    @IsString()
     STORAGE_PROVIDER?: string;
 
     // Redis Configuration
+    @IsNotEmpty()
+    @IsString()
     REDIS_HOST?: string;
+
+    @IsNotEmpty()
+    @IsNumber()
+    @Type(() => Number)
     REDIS_PORT?: number;
+
+    @IsNotEmpty()
+    @IsString()
     REDIS_PASSWORD?: string;
 
-    // Mailgun Configuration
-    MAILGUN_API_KEY?: string;
-    MAILGUN_DOMAIN?: string;
-    MAILGUN_FROM_EMAIL?: string;
 
     // Twilio Configuration
     TWILIO_ACCOUNT_SID?: string;
@@ -124,30 +143,58 @@ class Config {
     TWILIO_PHONE_NUMBER?: string;
 
     // OpenAI Configuration
+    @IsNotEmpty()
     @IsString()
     OPENAI_API_KEY?: string;
 
+    @IsNotEmpty()
     @IsString()
     OPENAI_MODEL?: string;
 
+    @IsNotEmpty()
     @IsString()
     OPENAI_NLP_MODEL?: string;
 
+    @IsNotEmpty()
     @IsString()
     OPENAI_TTS_MODEL?: string;
 
+    @IsNotEmpty()
     @IsString()
     OPENAI_TTS_VOICE?: string;
 
+    @IsNotEmpty()
     @IsString()
     OPENAI_TRANSCRIPTION_MODEL: string;
+
+    @IsNotEmpty()
+    @IsString()
+    ENABLE_IMAGE_COMPRESSION: string;
+
+    @IsNotEmpty()
+    @IsString()
+    ENABLE_VIDEO_COMPRESSION: string;
+
+    @IsNotEmpty()
+    @IsNumber()
+    COMPRESSION_QUALITY_SMALL: number;
+
+    @IsNotEmpty()
+    @IsNumber()
+    COMPRESSION_QUALITY_MEDIUM: number;
+
+    @IsNotEmpty()
+    @IsNumber()
+    COMPRESSION_QUALITY_LARGE: number;
 }
 
 export let config: Config;
 // export let config: Config = plainToInstance(Config, { ...process.env });
 
 export const setupConfig = async () => {
-    config = plainToInstance(Config, process.env);
+    config = plainToInstance(Config, process.env, {
+        enableImplicitConversion: true,
+    });
     const [error] = await validate(config, { whitelist: true })
     if (error) return error;
 }

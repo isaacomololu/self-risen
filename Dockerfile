@@ -3,8 +3,9 @@
 # Stage 1: Dependencies
 FROM node:20-alpine AS dependencies
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm and ffmpeg (required for video compression)
+RUN npm install -g pnpm && \
+    apk add --no-cache ffmpeg
 
 WORKDIR /app
 
@@ -17,8 +18,9 @@ RUN pnpm install --frozen-lockfile
 # Stage 2: Build
 FROM node:20-alpine AS build
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm and ffmpeg (required for video compression)
+RUN npm install -g pnpm && \
+    apk add --no-cache ffmpeg
 
 WORKDIR /app
 
@@ -45,8 +47,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm and ffmpeg (required for video compression)
+RUN npm install -g pnpm && \
+    apk add --no-cache ffmpeg
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./

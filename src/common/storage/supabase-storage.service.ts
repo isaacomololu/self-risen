@@ -3,12 +3,14 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { FileType, UploadResult } from './storage.service';
+import { CompressionService } from './compression.service';
 
 @Injectable()
 export class SupabaseStorageService {
     private readonly logger = new Logger(SupabaseStorageService.name);
     private supabase?: SupabaseClient;
     private bucketName?: string;
+    private compressionService?: CompressionService;
 
     // Allowed MIME types for each file type
     private readonly ALLOWED_IMAGE_TYPES = [
@@ -47,10 +49,11 @@ export class SupabaseStorageService {
     private readonly MAX_VIDEO_SIZE = Number.MAX_SAFE_INTEGER; // Unlimited
     // private readonly MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
 
-    constructor() {
+    constructor(compressionService?: CompressionService) {
         // Defer initialization - will be initialized when first used
         // This allows the service to be instantiated even when config is missing
         // (e.g., when using Firebase provider)
+        this.compressionService = compressionService;
         this.initialize();
     }
 
@@ -157,9 +160,18 @@ export class SupabaseStorageService {
         userId: string,
         originalName: string,
         folder?: string,
+        mimetype?: string,
     ): string {
         const timestamp = Date.now();
-        const fileExtension = originalName.split('.').pop();
+        // For compressed images, use .webp extension
+        let fileExtension = originalName.split('.').pop();
+        if (fileType === FileType.IMAGE && mimetype === 'image/webp') {
+            fileExtension = 'webp';
+        }
+        // For compressed videos, use .mp4 extension
+        if (fileType === FileType.VIDEO && mimetype === 'video/mp4') {
+            fileExtension = 'mp4';
+        }
         const fileName = `${uuidv4()}-${timestamp}.${fileExtension}`;
 
         if (folder) {
@@ -184,12 +196,61 @@ export class SupabaseStorageService {
         );
 
         this.ensureInitialized();
-        // Validate file
-        this.validateFile(file, fileType);
+
+        // Verify bucket exists and is accessible
+        if (!this.bucketName) {
+            throw new BadRequestException(
+                'Supabase Storage bucket is not configured. Please set SUPABASE_STORAGE_BUCKET environment variable.',
+            );
+        }
+
+        // Store original file for validation
+        const originalFile = { ...file };
+
+        // Compress file if compression service is available
+        if (this.compressionService) {
+            try {
+                if (fileType === FileType.IMAGE) {
+                    const compressionResult = await this.compressionService.compressImage(file);
+                    if (compressionResult) {
+                        file.buffer = compressionResult.buffer;
+                        file.mimetype = compressionResult.mimetype;
+                        file.size = compressionResult.compressedSize;
+                        this.logger.log(
+                            `Image compressed: ${compressionResult.reductionPercentage.toFixed(1)}% reduction`,
+                        );
+                    }
+                } else if (fileType === FileType.VIDEO) {
+                    const compressionResult = await this.compressionService.compressVideo(file);
+                    if (compressionResult) {
+                        file.buffer = compressionResult.buffer;
+                        file.mimetype = compressionResult.mimetype;
+                        file.size = compressionResult.compressedSize;
+                        this.logger.log(
+                            `Video compressed: ${compressionResult.reductionPercentage.toFixed(1)}% reduction`,
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Compression failed, using original file: ${error.message}`,
+                );
+                // Continue with original file if compression fails
+            }
+        }
+
+        // Validate file (check original size against limits)
+        this.validateFile(originalFile, fileType);
         this.logger.debug('File validation passed');
 
-        // Generate file path
-        const filePath = this.generateFilePath(fileType, userId, file.originalname, folder);
+        // Generate file path (use compressed mimetype if available)
+        const filePath = this.generateFilePath(
+            fileType,
+            userId,
+            file.originalname,
+            folder,
+            file.mimetype,
+        );
         this.logger.debug(`Generated file path: ${filePath}`);
 
         try {
@@ -219,7 +280,23 @@ export class SupabaseStorageService {
                 this.logger.error(
                     `Supabase upload error - Message: ${error.message}, Error: ${JSON.stringify(error)}`,
                 );
-                throw new BadRequestException(`Failed to upload file: ${error.message}`);
+
+                // Provide more helpful error messages for common Supabase errors
+                if (error.message?.includes('Bucket not found') || error.message?.includes('does not exist')) {
+                    throw new BadRequestException(
+                        `Supabase Storage bucket "${this.bucketName}" does not exist. Please create the bucket in Supabase Dashboard or check your SUPABASE_STORAGE_BUCKET configuration.`,
+                    );
+                }
+
+                if (error.message?.includes('new row violates row-level security')) {
+                    throw new BadRequestException(
+                        `Upload failed: Row-level security policy violation. Please check your Supabase bucket policies.`,
+                    );
+                }
+
+                throw new BadRequestException(
+                    `Failed to upload file to Supabase: ${error.message || JSON.stringify(error)}`,
+                );
             }
 
             this.logger.log(`File uploaded successfully. Path: ${filePath}`);

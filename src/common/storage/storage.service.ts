@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { SupabaseStorageService } from './supabase-storage.service';
+import { CompressionService } from './compression.service';
 
 export enum FileType {
   IMAGE = 'image',
@@ -28,6 +29,7 @@ export class StorageService {
   private readonly provider: StorageProvider;
   private readonly bucket?: any;
   private readonly supabaseService?: SupabaseStorageService;
+  private readonly compressionService?: CompressionService;
 
   private readonly ALLOWED_IMAGE_TYPES = [
     'image/jpeg',
@@ -64,7 +66,10 @@ export class StorageService {
   private readonly MAX_AUDIO_SIZE = 50 * 1024 * 1024; // 50MB
   private readonly MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
 
-  constructor(supabaseService?: SupabaseStorageService) {
+  constructor(
+    supabaseService?: SupabaseStorageService,
+    compressionService?: CompressionService,
+  ) {
     // Determine which provider to use (defaults to 'firebase')
     const storageProvider = (config.STORAGE_PROVIDER as StorageProvider) || StorageProvider.SUPABASE;
     this.provider = storageProvider;
@@ -86,6 +91,8 @@ export class StorageService {
       console.log(`[StorageService] Using Firebase Storage with bucket: ${bucketName}`);
       this.bucket = admin.storage().bucket(bucketName);
     }
+
+    this.compressionService = compressionService;
   }
 
   /**
@@ -159,9 +166,18 @@ export class StorageService {
     userId: string,
     originalName: string,
     folder?: string,
+    mimetype?: string,
   ): string {
     const timestamp = Date.now();
-    const fileExtension = originalName.split('.').pop();
+    // For compressed images, use .webp extension
+    let fileExtension = originalName.split('.').pop();
+    if (fileType === FileType.IMAGE && mimetype === 'image/webp') {
+      fileExtension = 'webp';
+    }
+    // For compressed videos, use .mp4 extension
+    if (fileType === FileType.VIDEO && mimetype === 'video/mp4') {
+      fileExtension = 'mp4';
+    }
     const fileName = `${uuidv4()}-${timestamp}.${fileExtension}`;
 
     if (folder) {
@@ -191,11 +207,52 @@ export class StorageService {
     console.log(`[StorageService.uploadFile] Using Firebase provider`);
     console.log(`[StorageService.uploadFile] Bucket: ${this.bucket?.name || 'NOT SET'}`);
 
-    // Validate file
-    this.validateFile(file, fileType);
+    // Store original file for validation
+    const originalFile = { ...file };
 
-    // Generate file path
-    const filePath = this.generateFilePath(fileType, userId, file.originalname, folder);
+    // Compress file if compression service is available
+    if (this.compressionService) {
+      try {
+        if (fileType === FileType.IMAGE) {
+          const compressionResult = await this.compressionService.compressImage(file);
+          if (compressionResult) {
+            file.buffer = compressionResult.buffer;
+            file.mimetype = compressionResult.mimetype;
+            file.size = compressionResult.compressedSize;
+            console.log(
+              `[StorageService.uploadFile] Image compressed: ${compressionResult.reductionPercentage.toFixed(1)}% reduction`,
+            );
+          }
+        } else if (fileType === FileType.VIDEO) {
+          const compressionResult = await this.compressionService.compressVideo(file);
+          if (compressionResult) {
+            file.buffer = compressionResult.buffer;
+            file.mimetype = compressionResult.mimetype;
+            file.size = compressionResult.compressedSize;
+            console.log(
+              `[StorageService.uploadFile] Video compressed: ${compressionResult.reductionPercentage.toFixed(1)}% reduction`,
+            );
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `[StorageService.uploadFile] Compression failed, using original file: ${error.message}`,
+        );
+        // Continue with original file if compression fails
+      }
+    }
+
+    // Validate file (check original size against limits)
+    this.validateFile(originalFile, fileType);
+
+    // Generate file path (use compressed mimetype if available)
+    const filePath = this.generateFilePath(
+      fileType,
+      userId,
+      file.originalname,
+      folder,
+      file.mimetype,
+    );
     console.log(`[StorageService.uploadFile] Generated file path: ${filePath}`);
 
     // Create file reference

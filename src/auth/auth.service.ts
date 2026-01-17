@@ -293,7 +293,7 @@ export class AuthService extends BaseService {
 
       // Generate Firebase tokens for API authentication
       const customToken = await auth().createCustomToken(firebaseUid);
-      
+
       // Exchange custom token for ID token and refresh token
       const firebaseWebApiKey = config.FIREBASE_API_KEY;
       const tokenResponse = await fetch(
@@ -368,7 +368,7 @@ export class AuthService extends BaseService {
       const appleUserId = tokenPayload.sub; // Apple user ID
       const email = tokenPayload.email as string | undefined;
       const emailVerified = tokenPayload.email_verified === true || tokenPayload.email_verified === 'true';
-      
+
       // Name is only provided on first sign-in, may be in tokenPayload.name or null
       let name: string | undefined;
       if (tokenPayload.name) {
@@ -457,7 +457,7 @@ export class AuthService extends BaseService {
 
       // Generate Firebase tokens for API authentication
       const customToken = await auth().createCustomToken(firebaseUid);
-      
+
       // Exchange custom token for ID token and refresh token
       const firebaseWebApiKey = config.FIREBASE_API_KEY;
       const tokenResponse = await fetch(

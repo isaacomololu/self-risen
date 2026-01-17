@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { StorageService } from './storage.service';
 import { StorageController } from './storage.controller';
 import { SupabaseStorageService } from './supabase-storage.service';
+import { CompressionService } from './compression.service';
 import { config } from '../config';
 import { StorageProvider } from './storage.service';
 
@@ -10,20 +11,25 @@ import { StorageProvider } from './storage.service';
   imports: [ConfigModule],
   controllers: [StorageController],
   providers: [
+    CompressionService,
     {
       provide: SupabaseStorageService,
-      useFactory: () => {
+      useFactory: (compressionService: CompressionService) => {
         // Always create SupabaseStorageService, but it won't validate config
         // until it's actually used (when provider is Supabase)
-        return new SupabaseStorageService();
+        return new SupabaseStorageService(compressionService);
       },
+      inject: [CompressionService],
     },
     {
       provide: StorageService,
-      useFactory: (supabaseService: SupabaseStorageService) => {
-        return new StorageService(supabaseService);
+      useFactory: (
+        supabaseService: SupabaseStorageService,
+        compressionService: CompressionService,
+      ) => {
+        return new StorageService(supabaseService, compressionService);
       },
-      inject: [SupabaseStorageService],
+      inject: [SupabaseStorageService, CompressionService],
     },
   ],
   exports: [StorageService],
