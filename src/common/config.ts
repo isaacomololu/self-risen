@@ -186,6 +186,9 @@ class Config {
     @IsNotEmpty()
     @IsNumber()
     COMPRESSION_QUALITY_LARGE: number;
+
+    // Optional: Custom path to ffmpeg binary (useful if ffmpeg is not in PATH)
+    FFMPEG_PATH?: string;
 }
 
 export let config: Config;

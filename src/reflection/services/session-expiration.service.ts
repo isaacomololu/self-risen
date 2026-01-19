@@ -18,10 +18,10 @@ export class SessionExpirationService extends BaseService {
     }
 
     /**
-     * Cron job that runs every minute to check and complete expired waves
+     * Cron job that runs every day to check and complete expired waves
      * Completes sessions when their active wave expires
      */
-    @Cron('*/1 * * * *') // Every minute
+    @Cron('0 0 * * *') // Every day at midnight
     async checkAndCompleteExpiredWaves() {
         this.logger.log('Checking and completing expired waves');
         console.log('Checking and completing expired waves');

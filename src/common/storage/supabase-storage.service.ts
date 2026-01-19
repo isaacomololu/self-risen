@@ -119,7 +119,7 @@ export class SupabaseStorageService {
 
         if (!mimetype || !allowedTypes.includes(mimetype)) {
             // Fallback: check file extension for common cases (especially for iOS/React Native)
-            const extensionToMimeMap: Record<string, string[]> = {
+            const audioExtensionToMimeMap: Record<string, string[]> = {
                 'm4a': ['audio/m4a', 'audio/x-m4a', 'audio/mp4'],
                 'mp3': ['audio/mpeg', 'audio/mp3'],
                 'wav': ['audio/wav'],
@@ -128,15 +128,31 @@ export class SupabaseStorageService {
                 'webm': ['audio/webm'],
             };
 
-            if (fileType === FileType.AUDIO && fileExtension && extensionToMimeMap[fileExtension]) {
-                const expectedMimes = extensionToMimeMap[fileExtension];
+            const videoExtensionToMimeMap: Record<string, string[]> = {
+                'mov': ['video/quicktime', 'video/mp4'],
+                'mp4': ['video/mp4', 'video/mpeg'],
+                'mpeg': ['video/mpeg'],
+                'mpg': ['video/mpeg'],
+                'avi': ['video/x-msvideo'],
+                'webm': ['video/webm'],
+                'ogv': ['video/ogg'],
+            };
+
+            let isValidExtension = false;
+
+            if (fileType === FileType.AUDIO && fileExtension && audioExtensionToMimeMap[fileExtension]) {
+                const expectedMimes = audioExtensionToMimeMap[fileExtension];
                 if (expectedMimes.some(mime => allowedTypes.includes(mime))) {
-                } else {
-                    throw new BadRequestException(
-                        `Invalid file type. Received mimetype: "${mimetype}", file extension: "${fileExtension}". Allowed types for ${fileType}: ${allowedTypes.join(', ')}`,
-                    );
+                    isValidExtension = true;
                 }
-            } else {
+            } else if (fileType === FileType.VIDEO && fileExtension && videoExtensionToMimeMap[fileExtension]) {
+                const expectedMimes = videoExtensionToMimeMap[fileExtension];
+                if (expectedMimes.some(mime => allowedTypes.includes(mime))) {
+                    isValidExtension = true;
+                }
+            }
+
+            if (!isValidExtension) {
                 throw new BadRequestException(
                     `Invalid file type. Received mimetype: "${mimetype}", file extension: "${fileExtension}". Allowed types for ${fileType}: ${allowedTypes.join(', ')}`,
                 );
