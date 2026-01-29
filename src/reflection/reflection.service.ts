@@ -5,7 +5,7 @@ import { StorageService, FileType } from 'src/common/storage/storage.service';
 import { TranscriptionService } from './services/transcription.service';
 import { NlpTransformationService } from './services/nlp-transformation.service';
 import { TextToSpeechService } from './services/text-to-speech.service';
-import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, EditAffirmationDto } from './dto';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
 import { NotificationTypeEnum, NotificationChannelTypeEnum } from 'src/notifications/enums/notification.enum';
 import { randomUUID } from 'crypto';
@@ -383,6 +383,146 @@ export class ReflectionService extends BaseService {
     }
 
     /**
+     * Edit the affirmation text after AI has generated it.
+     * Allowed when session is in AFFIRMATION_GENERATED or APPROVED status.
+     * Clears AI-generated audio so user can regenerate voice for the new text.
+     */
+    async editAffirmation(firebaseId: string, sessionId: string, dto: EditAffirmationDto) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        if (session.status !== 'AFFIRMATION_GENERATED' && session.status !== 'APPROVED') {
+            return this.HandleError(
+                new BadRequestException(
+                    `Cannot edit affirmation. Session must have an affirmation (AFFIRMATION_GENERATED or APPROVED). Current status: ${session.status}`,
+                ),
+            );
+        }
+
+        if (!session.generatedAffirmation || session.generatedAffirmation.trim().length === 0) {
+            return this.HandleError(
+                new BadRequestException('Cannot edit affirmation. No generated affirmation found in session.'),
+            );
+        }
+
+        const trimmedAffirmation = dto.affirmation.trim();
+        if (trimmedAffirmation.length === 0) {
+            return this.HandleError(
+                new BadRequestException('Affirmation text cannot be empty.'),
+            );
+        }
+
+        const updatedSession = await this.prisma.reflectionSession.update({
+            where: { id: sessionId },
+            data: {
+                generatedAffirmation: trimmedAffirmation,
+                aiAffirmationAudioUrl: null, // Clear so user can regenerate TTS for new text
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        return this.Results(updatedSession);
+    }
+
+    /**
+     * Edit the belief text after AI has generated the affirmation.
+     * Allowed when session is in AFFIRMATION_GENERATED or APPROVED status.
+     * Affirmation and audio are unchanged.
+     */
+    async editBelief(firebaseId: string, sessionId: string, belief: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        if (session.status !== 'AFFIRMATION_GENERATED' && session.status !== 'APPROVED') {
+            return this.HandleError(
+                new BadRequestException(
+                    `Cannot edit belief. Session must have an affirmation (AFFIRMATION_GENERATED or APPROVED). Current status: ${session.status}`,
+                ),
+            );
+        }
+
+        if (!session.generatedAffirmation || session.generatedAffirmation.trim().length === 0) {
+            return this.HandleError(
+                new BadRequestException('Cannot edit belief. No generated affirmation found in session.'),
+            );
+        }
+
+        const trimmedBelief = belief.trim();
+        if (trimmedBelief.length === 0) {
+            return this.HandleError(
+                new BadRequestException('Belief text cannot be empty.'),
+            );
+        }
+
+        const updatedSession = await this.prisma.reflectionSession.update({
+            where: { id: sessionId },
+            data: {
+                rawBeliefText: trimmedBelief,
+                transcriptionText: trimmedBelief, // Keep in sync for display
+            },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        return this.Results(updatedSession);
+    }
+
+    /**
      * Re-record belief for a reflection session
      */
     async reRecordBelief(
@@ -626,9 +766,14 @@ export class ReflectionService extends BaseService {
             );
         }
 
-        const durationDays = dto.durationDays //|| 20; // Default to 20 days
-        const startDate = new Date();
-        const endDate = new Date();
+        const durationDays = dto.durationDays;
+        const startDate = dto.startDate ? new Date(dto.startDate) : new Date();
+        if (dto.startDate && startDate < new Date()) {
+            return this.HandleError(
+                new BadRequestException('Wave start date cannot be in the past.'),
+            );
+        }
+        const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + durationDays);
 
         // Create wave
@@ -667,7 +812,6 @@ export class ReflectionService extends BaseService {
             },
         });
 
-      
         return this.Results(sessionWithWave);
     }
 

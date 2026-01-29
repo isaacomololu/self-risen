@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsInt, IsIn, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, IsIn, Min, IsOptional, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateWaveDto {
@@ -21,4 +21,13 @@ export class CreateWaveDto {
     @IsIn([1, 3, 7, 14, 30])
     @Min(1)
     durationDays: number;
+
+    @ApiProperty({
+        description: 'Optional start date for the wave (ISO 8601). If omitted, the wave starts now. Past dates are not allowed.',
+        example: '2025-01-15T00:00:00.000Z',
+        required: false
+    })
+    @IsOptional()
+    @IsDateString()
+    startDate?: string;
 }

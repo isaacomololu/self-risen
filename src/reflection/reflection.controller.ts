@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Put,
+    Patch,
     Delete,
     Body,
     Param,
@@ -28,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { ReflectionService } from './reflection.service';
-import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, EditAffirmationDto, EditBeliefDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -207,6 +208,90 @@ export class ReflectionController extends BaseController {
 
         return this.response({
             message: 'Affirmation generated successfully',
+            data: result.data,
+        });
+    }
+
+    @Patch('sessions/:sessionId/affirmation')
+    @ApiOperation({
+        summary: 'Edit affirmation',
+        description: 'Allows the user to edit the AI-generated affirmation text after it has been generated. Session must be in AFFIRMATION_GENERATED or APPROVED status. AI-generated audio is cleared so the user can regenerate voice for the new text.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiBody({ type: EditAffirmationDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmation updated successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Session not in correct status or missing affirmation',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Reflection session not found',
+    })
+    async editAffirmation(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+        @Body() dto: EditAffirmationDto,
+    ) {
+        const result = await this.reflectionService.editAffirmation(
+            user.uid,
+            sessionId,
+            dto,
+        );
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Affirmation updated successfully',
+            data: result.data,
+        });
+    }
+
+    @Patch('sessions/:sessionId/belief')
+    @ApiOperation({
+        summary: 'Edit belief',
+        description: 'Allows the user to edit the belief text after the AI has generated the affirmation. Session must be in AFFIRMATION_GENERATED or APPROVED status. Affirmation and audio are unchanged.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiBody({ type: EditBeliefDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Belief updated successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Session not in correct status or missing affirmation',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Reflection session not found',
+    })
+    async editBelief(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+        @Body() dto: EditBeliefDto,
+    ) {
+        const result = await this.reflectionService.editBelief(
+            user.uid,
+            sessionId,
+            dto.belief,
+        );
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Belief updated successfully',
             data: result.data,
         });
     }
