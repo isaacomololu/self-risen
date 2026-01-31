@@ -1,16 +1,18 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 // import { CreateUserDto, LoginUserDto, UpdateUserDto } from './dto';
 import { User } from '@prisma/client';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { BaseService, FileType, StorageService } from 'src/common';
 import { ChangeNameDto, ChangeUsernameDto, ChangeTtsVoicePreferenceDto } from './dto';
+import { TextToSpeechService } from 'src/reflection/services/text-to-speech.service';
 import { UploadAvatarDto } from './dto/upload-avatar.dto';
 import { config } from 'src/common';
 @Injectable()
 export class UserService extends BaseService {
   constructor(
     private prisma: DatabaseProvider,
-    private storageService: StorageService
+    private storageService: StorageService,
+    private textToSpeechService: TextToSpeechService
   ) {
     super();
   }
@@ -182,13 +184,61 @@ export class UserService extends BaseService {
       )
     };
 
+    // Convert persona name to enum value
+    const nameToEnumMap: Record<string, string> = {
+      'Marcus': 'MALE_CONFIDENT',
+      'Daniel': 'MALE_FRIENDLY',
+      'Sophia': 'FEMALE_EMPATHETIC',
+      'Maya': 'FEMALE_ENERGETIC',
+      'Alex': 'ANDROGYNOUS_CALM',
+      'River': 'ANDROGYNOUS_WISE',
+    };
+
+    const enumValue = nameToEnumMap[ttsVoicePreference];
+    if (!enumValue) {
+      return this.HandleError(
+        new BadRequestException(`Invalid persona name: ${ttsVoicePreference}`)
+      );
+    }
+
     const updatedUser = await this.prisma.user.update({
       where: { firebaseId },
       data: {
-        ttsVoicePreference,
+        ttsVoicePreference: enumValue as any,
       }
     })
 
     return this.Results(updatedUser);
+  }
+
+  async getAvailablePersonas() {
+    const allPersonas = this.textToSpeechService.getAllPersonas();
+    
+    // Transform the data to be more frontend-friendly
+    const formattedPersonas = {
+      male: allPersonas.male.map(p => ({
+        name: p.config.name,
+        displayName: p.config.displayName,
+        gender: p.config.gender,
+        description: p.config.description,
+        personality: p.config.personality
+      })),
+      female: allPersonas.female.map(p => ({
+        name: p.config.name,
+        displayName: p.config.displayName,
+        gender: p.config.gender,
+        description: p.config.description,
+        personality: p.config.personality
+      })),
+      androgynous: allPersonas.androgynous.map(p => ({
+        name: p.config.name,
+        displayName: p.config.displayName,
+        gender: p.config.gender,
+        description: p.config.description,
+        personality: p.config.personality
+      }))
+    };
+
+    return this.Results(formattedPersonas);
   }
 }

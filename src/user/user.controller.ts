@@ -355,25 +355,107 @@ export class UserController extends BaseController {
     });
   }
 
+  @Get('preferences/tts-voice/personas')
+  @ApiOperation({
+    summary: 'Get all available TTS voice personas',
+    description: 'Returns a list of all available voice personas with their details including name, role, gender, description, and personality traits. Use this endpoint to populate persona selection UI.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all available personas',
+    schema: {
+      type: 'object',
+      properties: {
+        male: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', example: 'Marcus' },
+              displayName: { type: 'string', example: 'Marcus (Confident Coach - Male)' },
+              gender: { type: 'string', example: 'male' },
+              description: { type: 'string', example: 'Deep, authoritative voice that commands attention' },
+              personality: { type: 'array', items: { type: 'string' }, example: ['authoritative', 'grounding', 'powerful'] }
+            }
+          }
+        },
+        female: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', example: 'Sophia' },
+              displayName: { type: 'string', example: 'Sophia (Empathetic Mentor - Female)' },
+              gender: { type: 'string', example: 'female' },
+              description: { type: 'string', example: 'Nurturing, warm voice that radiates compassion' },
+              personality: { type: 'array', items: { type: 'string' }, example: ['nurturing', 'compassionate'] }
+            }
+          }
+        },
+        androgynous: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', example: 'Alex' },
+              displayName: { type: 'string', example: 'Alex (Calm Companion - Androgynous)' },
+              gender: { type: 'string', example: 'androgynous' },
+              description: { type: 'string', example: 'Balanced, neutral voice that brings steadiness' },
+              personality: { type: 'array', items: { type: 'string' }, example: ['balanced', 'neutral'] }
+            }
+          }
+        }
+      }
+    }
+  })
+  async getAvailablePersonas() {
+    const personas = await this.userService.getAvailablePersonas();
+    
+    if (personas.isError) throw personas.error;
+
+    return this.response({
+      message: 'Available voice personas retrieved',
+      data: personas.data,
+    })
+  }
+
   @Patch('preferences/tts-voice')
   @ApiOperation({
-    summary: 'Update TTS voice preference',
-    description: 'Updates the user\'s text-to-speech voice preference (MALE, FEMALE, or ANDROGYNOUS). This preference will be used for all future AI-generated affirmation audio.',
+    summary: 'Update TTS voice persona preference',
+    description: 'Updates the user\'s text-to-speech voice persona preference. Choose from 6 distinct personas with unique names, personalities, and tones. This preference will be used for all future AI-generated affirmation audio.',
   })
   @ApiBody({
     type: ChangeTtsVoicePreferenceDto,
     examples: {
-      male: {
-        summary: 'Set voice to male',
-        value: { ttsVoicePreference: 'MALE' }
+      marcus: {
+        summary: 'Marcus (Confident Coach)',
+        value: { ttsVoicePreference: 'Marcus' },
+        description: 'Deep, authoritative voice that commands attention. Personality: authoritative, grounding, powerful, commanding.'
       },
-      female: {
-        summary: 'Set voice to female',
-        value: { ttsVoicePreference: 'FEMALE' }
+      daniel: {
+        summary: 'Daniel (Friendly Guide)',
+        value: { ttsVoicePreference: 'Daniel' },
+        description: 'Warm, conversational voice that feels approachable. Personality: approachable, supportive, encouraging, relatable.'
       },
-      androgynous: {
-        summary: 'Set voice to androgynous',
-        value: { ttsVoicePreference: 'ANDROGYNOUS' }
+      sophia: {
+        summary: 'Sophia (Empathetic Mentor)',
+        value: { ttsVoicePreference: 'Sophia' },
+        description: 'Nurturing, warm voice that radiates compassion. Personality: nurturing, compassionate, understanding, gentle.'
+      },
+      maya: {
+        summary: 'Maya (Energetic Motivator)',
+        value: { ttsVoicePreference: 'Maya' },
+        description: 'Upbeat, vibrant voice that inspires action. Personality: upbeat, vibrant, motivating, enthusiastic.'
+      },
+      alex: {
+        summary: 'Alex (Calm Companion)',
+        value: { ttsVoicePreference: 'Alex' },
+        description: 'Balanced, neutral voice that brings steadiness. Personality: balanced, neutral, steady, peaceful.'
+      },
+      river: {
+        summary: 'River (Wise Advisor)',
+        value: { ttsVoicePreference: 'River' },
+        description: 'Thoughtful, mature voice that conveys wisdom. Personality: thoughtful, mature, grounded, insightful.'
       }
     }
   })
@@ -386,7 +468,7 @@ export class UserController extends BaseController {
     if (updatedUser.isError) throw updatedUser.error;
 
     return this.response({
-      message: 'Voice preference updated',
+      message: 'Voice persona preference updated',
       data: updatedUser.data,
     })
   }

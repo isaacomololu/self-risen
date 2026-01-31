@@ -35,7 +35,7 @@ describe('ReflectionService', () => {
     firebaseId: 'firebase-uid-123',
     email: 'test@example.com',
     name: 'Test User',
-    ttsVoicePreference: TtsVoicePreference.MALE,
+    ttsVoicePreference: TtsVoicePreference.MALE_CONFIDENT,
   };
 
   const mockCategory = {
@@ -544,13 +544,13 @@ describe('ReflectionService', () => {
         aiAffirmationAudioUrl: 'https://new-audio.com/audio.mp3',
       });
 
-      const result = await service.regenerateAffirmationVoice('firebase-uid-123', 'session-123', { voicePreference: TtsVoicePreference.FEMALE });
+      const result = await service.regenerateAffirmationVoice('firebase-uid-123', 'session-123', { voicePreference: TtsVoicePreference.FEMALE_EMPATHETIC });
 
       expect(result.isError).toBe(false);
       expect(mockTextToSpeechService.generateAffirmationAudio).toHaveBeenCalledWith(
         'I am healthy and vibrant',
         'user-123',
-        TtsVoicePreference.FEMALE,
+        TtsVoicePreference.FEMALE_EMPATHETIC,
       );
     });
 
@@ -565,7 +565,7 @@ describe('ReflectionService', () => {
       expect(mockTextToSpeechService.generateAffirmationAudio).toHaveBeenCalledWith(
         'I am healthy and vibrant',
         'user-123',
-        TtsVoicePreference.MALE,
+        TtsVoicePreference.MALE_CONFIDENT,
       );
     });
 
