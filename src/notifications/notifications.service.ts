@@ -550,7 +550,7 @@ export class NotificationsService
     return results;
   }
 
-  async getUserNotifications(firebaseId: string, page = 1, perPage = 10) {
+  async getUserNotifications(firebaseId: string, page = 1, perPage = 10, unreadOnly = false) {
     const user = await this.prisma.user.findUnique({
       where: { firebaseId },
       select: { id: true },
@@ -564,16 +564,22 @@ export class NotificationsService
     const perPageNumber = Math.max(1, Math.min(100, Math.floor(perPage)));
     const skip = (pageNumber - 1) * perPageNumber;
 
+    // Build where clause with optional unreadOnly filter
+    const whereClause: any = { recipientId: user.id };
+    if (unreadOnly) {
+      whereClause.isRead = false;
+    }
+
     const [recipients, totalCount] = await Promise.all([
       this.prisma.notificationRecipient.findMany({
-        where: { recipientId: user.id },
+        where: whereClause,
         include: { notification: true },
         orderBy: { createdAt: 'desc' },
         take: perPageNumber,
         skip,
       }),
       this.prisma.notificationRecipient.count({
-        where: { recipientId: user.id },
+        where: whereClause,
       }),
     ]);
 

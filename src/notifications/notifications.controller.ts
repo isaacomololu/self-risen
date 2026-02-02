@@ -83,19 +83,23 @@ export class NotificationsController extends BaseController {
   @ApiOperation({ summary: 'Get user notifications with pagination' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'perPage', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @ApiQuery({ name: 'unreadOnly', required: false, type: Boolean, description: 'Filter to show only unread notifications (default: false)' })
   @UseGuards(FirebaseGuard)
   async getNotifications(
     @FirebaseUser() user: auth.DecodedIdToken,
     @Query('page') page?: string,
     @Query('perPage') perPage?: string,
+    @Query('unreadOnly') unreadOnly?: string,
   ) {
     const pageNumber = page ? parseInt(page, 10) : 1;
     const perPageNumber = perPage ? parseInt(perPage, 10) : 10;
+    const unreadOnlyFlag = unreadOnly === 'true';
 
     const result = await this.notificationsService.getUserNotifications(
       user.uid,
       pageNumber,
       perPageNumber,
+      unreadOnlyFlag,
     );
     if (result.isError) throw result.error;
 

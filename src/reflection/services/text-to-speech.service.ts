@@ -38,7 +38,7 @@ export class TextToSpeechService extends BaseService {
             description: 'Warm, conversational voice that feels approachable',
             personality: ['approachable', 'supportive', 'encouraging', 'relatable']
         },
-        
+
         // Female Personas
         [TtsVoicePreference.FEMALE_EMPATHETIC]: {
             openAiVoice: 'nova',
@@ -56,7 +56,7 @@ export class TextToSpeechService extends BaseService {
             description: 'Upbeat, vibrant voice that inspires action',
             personality: ['upbeat', 'vibrant', 'motivating', 'enthusiastic']
         },
-        
+
         // Androgynous Personas
         [TtsVoicePreference.ANDROGYNOUS_CALM]: {
             openAiVoice: 'alloy',
