@@ -850,9 +850,32 @@ export class ReflectionService extends BaseService {
         // Prepare update data
         const updateData: any = {};
 
-        if (dto.durationDays !== undefined) {
+        // Handle startDate update
+        if (dto.startDate !== undefined) {
+            const newStartDate = new Date(dto.startDate);
+            
+            // Validate that start date is not in the past
+            if (newStartDate < new Date()) {
+                return this.HandleError(
+                    new BadRequestException('Wave start date cannot be in the past.'),
+                );
+            }
+
+            updateData.startDate = newStartDate;
+
+            // Recalculate endDate based on new startDate and current/updated duration
+            const effectiveDuration = dto.durationDays ?? wave.durationDays;
+            const newEndDate = new Date(newStartDate);
+            newEndDate.setDate(newEndDate.getDate() + effectiveDuration);
+            updateData.endDate = newEndDate;
+            
+            // Update duration if it was also provided
+            if (dto.durationDays !== undefined) {
+                updateData.durationDays = dto.durationDays;
+            }
+        } else if (dto.durationDays !== undefined) {
+            // Only duration is being updated, use existing startDate
             updateData.durationDays = dto.durationDays;
-            // Recalculate endDate from existing startDate when duration is updated
             const newEndDate = new Date(wave.startDate);
             newEndDate.setDate(newEndDate.getDate() + dto.durationDays);
             updateData.endDate = newEndDate;

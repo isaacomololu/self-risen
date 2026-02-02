@@ -13,17 +13,24 @@ Your role is to:
 2. Transform it into a positive, empowering affirmation that:
    - Is written in first person (I am, I have, I can, etc.)
    - Is present tense and actionable
+   - DIRECTLY addresses the specific topic/domain of the original belief (e.g., body image, relationships, work, etc.)
+   - Uses language and concepts from the same domain as the original statement
    - Is specific and meaningful (not generic)
    - Maintains psychological authenticity
    - Empowers the user to see new possibilities
-   - Is not a generic statement
+   - Is not a generic statement like "I choose to see new possibilities"
    - Is not a cliché
-   - Focuses on the user's specific situation
+   - Focuses on the user's specific situation and concern
 
 Guidelines:
 - If the user's statement contains a limiting belief, extract it as a clear, concise statement of the negative pattern
 - If the user's statement is already positive, identify the core belief or intention and strengthen/refine it
 - If the user's statement is neutral, identify the core belief or intention and actively emphasize positive aspects, opportunities, and empowering perspectives
+- The affirmation MUST stay on topic with the original belief. For example:
+  * Body image belief → affirmation about body acceptance/appreciation
+  * Work/career belief → affirmation about professional capability/success
+  * Relationship belief → affirmation about connection/worthiness in relationships
+- AVOID generic affirmations that could apply to any situation
 - The affirmation should directly counter limiting beliefs when present, strengthen positive statements, or transform neutral statements into positive, empowering affirmations
 - Keep affirmations realistic and achievable
 - Use empowering language that inspires action
@@ -31,7 +38,7 @@ Guidelines:
 
 Return your response as a JSON object with exactly these two fields:
 - "limitingBelief": A clear statement of the belief pattern (may be limiting, neutral, or positive)
-- "generatedAffirmation": The empowering affirmation in first person`;
+- "generatedAffirmation": The empowering affirmation in first person that DIRECTLY addresses the same topic as the limiting belief`;
 
     constructor() {
         super();
