@@ -17,9 +17,32 @@ export class UserService extends BaseService {
     super();
   }
 
+  /**
+   * Enrich user object with TTS voice persona details
+   */
+  private enrichUserWithPersonaDetails(user: any) {
+    if (!user) return user;
+
+    const personaDetails = user.ttsVoicePreference 
+      ? this.textToSpeechService.getPersonaMetadata(user.ttsVoicePreference)
+      : null;
+
+    return {
+      ...user,
+      ttsVoicePersona: personaDetails ? {
+        name: personaDetails.name,
+        displayName: personaDetails.displayName,
+        gender: personaDetails.gender,
+        description: personaDetails.description,
+        personality: personaDetails.personality
+      } : null
+    };
+  }
+
   async findAll() { // add pagination
     const users = await this.prisma.user.findMany();
-    return this.Results(users);
+    const enrichedUsers = users.map(user => this.enrichUserWithPersonaDetails(user));
+    return this.Results(enrichedUsers);
   }
 
   async getUserProfile(firebaseId: string) {
@@ -33,7 +56,8 @@ export class UserService extends BaseService {
       )
     };
 
-    return this.Results(user);
+    const enrichedUser = this.enrichUserWithPersonaDetails(user);
+    return this.Results(enrichedUser);
   }
 
   async changeName(firebaseId: string, payload: ChangeNameDto) {
@@ -56,7 +80,8 @@ export class UserService extends BaseService {
       }
     })
 
-    return this.Results(updatedUser);
+    const enrichedUser = this.enrichUserWithPersonaDetails(updatedUser);
+    return this.Results(enrichedUser);
   }
 
   async changeUsername(firebaseId: string, payload: ChangeUsernameDto) {
@@ -142,7 +167,8 @@ export class UserService extends BaseService {
       });
 
       console.log(`[UserService.uploadAvatar] User avatar updated successfully`);
-      return this.Results(updatedUser);
+      const enrichedUser = this.enrichUserWithPersonaDetails(updatedUser);
+      return this.Results(enrichedUser);
     } catch (error) {
       console.error(`[UserService.uploadAvatar] Error during upload:`, {
         error: error.message,
@@ -208,7 +234,8 @@ export class UserService extends BaseService {
       }
     })
 
-    return this.Results(updatedUser);
+    const enrichedUser = this.enrichUserWithPersonaDetails(updatedUser);
+    return this.Results(enrichedUser);
   }
 
   async getAvailablePersonas() {
