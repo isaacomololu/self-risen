@@ -608,8 +608,13 @@ export class NotificationsService
       return this.HandleError(new NotFoundException('User not found'));
     }
 
-    await this.prisma.notificationRecipient.updateMany({
-      where: { recipientId: user.id, notificationId },
+    await this.prisma.notificationRecipient.update({
+      where: {
+        recipientId_notificationId: {
+          recipientId: user.id,
+          notificationId,
+        },
+      },
       data: { isRead: true },
     });
 
