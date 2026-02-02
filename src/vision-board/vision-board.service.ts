@@ -193,6 +193,14 @@ export class VisionBoardService extends BaseService {
             },
         });
 
+        // Update reflection session to mark it as a vision
+        if (reflectionSessionId) {
+            await this.prisma.reflectionSession.update({
+                where: { id: reflectionSessionId },
+                data: { isVision: true },
+            });
+        }
+
         // Use already fetched reflection session data if available, otherwise use from visionItem
         if (reflectionSession && visionItem.reflectionSession) {
             // Use the already fetched data
@@ -448,6 +456,25 @@ export class VisionBoardService extends BaseService {
             },
         });
 
+        // Update isVision flags for reflection sessions
+        if (reflectionSessionId !== undefined) {
+            // If unlinking old reflection session, set isVision to false
+            if (visionItem.reflectionSessionId && visionItem.reflectionSessionId !== reflectionSessionId) {
+                await this.prisma.reflectionSession.update({
+                    where: { id: visionItem.reflectionSessionId },
+                    data: { isVision: false },
+                });
+            }
+
+            // If linking to new reflection session, set isVision to true
+            if (reflectionSessionId) {
+                await this.prisma.reflectionSession.update({
+                    where: { id: reflectionSessionId },
+                    data: { isVision: true },
+                });
+            }
+        }
+
         return this.Results(this.mapVisionToResponse(updatedItem));
     }
 
@@ -484,6 +511,14 @@ export class VisionBoardService extends BaseService {
                 // Log error but don't fail the deletion if image deletion fails
                 this.logger.warn(`Failed to delete image for vision ${visionId}: ${visionItem.imageUrl}`, error);
             }
+        }
+
+        // Update reflection session to mark it as no longer a vision
+        if (visionItem.reflectionSessionId) {
+            await this.prisma.reflectionSession.update({
+                where: { id: visionItem.reflectionSessionId },
+                data: { isVision: false },
+            });
         }
 
         await this.prisma.vision.delete({
