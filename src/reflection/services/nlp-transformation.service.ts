@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { config, BaseService } from 'src/common';
 import OpenAI from 'openai';
+import { TokenUsageService } from 'src/user/token-usage.service';
 
 @Injectable()
 export class NlpTransformationService extends BaseService {
@@ -40,7 +41,7 @@ Return your response as a JSON object with exactly these two fields:
 - "limitingBelief": A clear statement of the belief pattern (may be limiting, neutral, or positive)
 - "generatedAffirmation": The empowering affirmation in first person that DIRECTLY addresses the same topic as the limiting belief`;
 
-    constructor() {
+    constructor(private tokenUsageService: TokenUsageService) {
         super();
         this.openai = new OpenAI({
             apiKey: config.OPENAI_API_KEY,
@@ -52,9 +53,10 @@ Return your response as a JSON object with exactly these two fields:
      * Transform limiting belief into empowering affirmation using OpenAI
      * 
      * @param beliefText - The user's raw belief text
+     * @param userId - The user's database ID for token tracking
      * @returns Object containing limiting belief and generated affirmation
      */
-    async transformBelief(beliefText: string): Promise<{ limitingBelief: string; generatedAffirmation: string }> {
+    async transformBelief(beliefText: string, userId?: string): Promise<{ limitingBelief: string; generatedAffirmation: string }> {
         if (!this.openai) {
             this.logger.warn('OpenAI not configured. Returning placeholder transformation.');
             return this.getPlaceholderTransformation(beliefText);
@@ -63,6 +65,18 @@ Return your response as a JSON object with exactly these two fields:
         if (!beliefText || beliefText.trim().length === 0) {
             this.logger.warn('Empty belief text provided. Returning placeholder.');
             return this.getPlaceholderTransformation(beliefText);
+        }
+
+        // Check token limit before making API call (if userId provided)
+        const estimatedTokens = this.estimateTokens(beliefText);
+        if (userId) {
+            try {
+                await this.tokenUsageService.checkTokenLimit(userId, estimatedTokens);
+            } catch (error) {
+                // If token limit exceeded, throw the error to the caller
+                this.logger.warn(`Token limit check failed for user ${userId}: ${error.message}`);
+                throw error;
+            }
         }
 
         try {
@@ -84,6 +98,13 @@ Return your response as a JSON object with exactly these two fields:
             const content = response.choices[0]?.message?.content;
             if (!content) {
                 throw new Error('Empty response from OpenAI');
+            }
+
+            // Track actual token usage (if userId provided)
+            if (userId && response.usage) {
+                const totalTokens = response.usage.total_tokens || estimatedTokens;
+                await this.tokenUsageService.trackTokenUsage(userId, totalTokens);
+                this.logger.log(`Tracked ${totalTokens} tokens for user ${userId}`);
             }
 
             // Parse JSON response
@@ -143,6 +164,18 @@ Return your response as a JSON object with exactly these two fields:
             .replace(/\n{2,}/g, '\n') // Replace multiple newlines with single
             .replace(/\s{2,}/g, ' ') // Replace multiple spaces with single
             .trim();
+    }
+
+    /**
+     * Estimate token count for a given text
+     * Rough estimation: ~4 characters per token for English text
+     */
+    private estimateTokens(text: string): number {
+        const systemPromptTokens = Math.ceil(this.systemPrompt.length / 4);
+        const userTextTokens = Math.ceil(text.length / 4);
+        const responseTokens = 500;
+        
+        return Math.ceil((systemPromptTokens + userTextTokens + responseTokens) * 1.1);
     }
 
     /**

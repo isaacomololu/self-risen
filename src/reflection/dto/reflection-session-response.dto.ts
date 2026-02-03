@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AffirmationResponseDto } from './affirmation-response.dto';
 
 export class ReflectionSessionResponseDto {
     @ApiProperty()
@@ -84,5 +85,12 @@ export class ReflectionSessionResponseDto {
         id: string;
         name: string;
     };
+
+    @ApiProperty({ 
+        required: false, 
+        type: [AffirmationResponseDto],
+        description: 'List of all affirmations generated for this session' 
+    })
+    affirmations?: AffirmationResponseDto[];
 }
 

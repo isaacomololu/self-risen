@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { BaseService } from 'src/common';
 import { StorageService, FileType } from 'src/common/storage/storage.service';
@@ -82,14 +82,13 @@ export class ReflectionService extends BaseService {
             where: {
                 id: sessionId,
                 userId: user.id,
-            }
+            },
         });
 
         if (!session) {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        // Add computed affirmationAudioUrl field
         return this.Results(session);
     }
 
@@ -221,6 +220,7 @@ export class ReflectionService extends BaseService {
 
     /**
      * Generate affirmation from belief using NLP transformation
+     * Now creates a new Affirmation record instead of just updating the session
      */
     async generateAffirmation(firebaseId: string, sessionId: string) {
         const user = await this.getUserByFirebaseId(firebaseId);
@@ -234,16 +234,21 @@ export class ReflectionService extends BaseService {
                 id: sessionId,
                 userId: user.id,
             },
+            include: {
+                affirmations: {
+                    orderBy: { order: 'asc' },
+                },
+            },
         });
 
         if (!session) {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        if (session.status !== 'BELIEF_CAPTURED') {
+        if (session.status !== 'BELIEF_CAPTURED' && session.status !== 'AFFIRMATION_GENERATED') {
             return this.HandleError(
                 new BadRequestException(
-                    `Cannot generate affirmation. Session must be in BELIEF_CAPTURED status. Current status: ${session.status}`,
+                    `Cannot generate affirmation. Session must be in BELIEF_CAPTURED or AFFIRMATION_GENERATED status. Current status: ${session.status}`,
                 ),
             );
         }
@@ -257,15 +262,21 @@ export class ReflectionService extends BaseService {
         try {
             const transformation = await this.nlpTransformationService.transformBelief(
                 session.rawBeliefText,
+                user.id, // Pass userId for token tracking
             );
 
-            let aiAffirmationAudioUrl: string | null = null;
-            if (transformation.generatedAffirmation) {
+            // Determine if this is the first affirmation
+            const isFirstAffirmation = session.affirmations.length === 0;
+            const nextOrder = session.affirmations.length;
+
+            // Only generate audio if this is the first affirmation (which will be auto-selected)
+            let audioUrl: string | null = null;
+            if (isFirstAffirmation && transformation.generatedAffirmation) {
                 try {
                     // Get user's voice preference
                     const voicePreference = user.ttsVoicePreference || null;
 
-                    aiAffirmationAudioUrl = await this.textToSpeechService.generateAffirmationAudio(
+                    audioUrl = await this.textToSpeechService.generateAffirmationAudio(
                         transformation.generatedAffirmation,
                         user.id,
                         voicePreference,
@@ -275,21 +286,42 @@ export class ReflectionService extends BaseService {
                 }
             }
 
-            // Update session with transformation results
+            // Create new Affirmation record
+            const newAffirmation = await this.prisma.affirmation.create({
+                data: {
+                    sessionId: sessionId,
+                    affirmationText: transformation.generatedAffirmation,
+                    audioUrl,
+                    isSelected: isFirstAffirmation, // First affirmation is auto-selected
+                    order: nextOrder,
+                },
+            });
+
+            // Update session with transformation results and status
+            // Also update generatedAffirmation and aiAffirmationAudioUrl for backward compatibility
+            const updateData: any = {
+                limitingBelief: transformation.limitingBelief,
+                status: 'AFFIRMATION_GENERATED',
+            };
+
+            // If this is the first affirmation or it's selected, update the session's legacy fields
+            if (isFirstAffirmation) {
+                updateData.generatedAffirmation = transformation.generatedAffirmation;
+                updateData.aiAffirmationAudioUrl = audioUrl;
+            }
+
             const updatedSession = await this.prisma.reflectionSession.update({
                 where: { id: sessionId },
-                data: {
-                    limitingBelief: transformation.limitingBelief,
-                    generatedAffirmation: transformation.generatedAffirmation,
-                    aiAffirmationAudioUrl,
-                    status: 'AFFIRMATION_GENERATED',
-                },
+                data: updateData,
                 include: {
                     category: {
                         select: {
                             id: true,
                             name: true,
                         },
+                    },
+                    affirmations: {
+                        orderBy: { order: 'asc' },
                     },
                 },
             });
@@ -317,26 +349,53 @@ export class ReflectionService extends BaseService {
                 this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
             }
 
+            this.logger.log(`Created affirmation ${newAffirmation.id} for session ${sessionId} (order: ${nextOrder}, selected: ${isFirstAffirmation})`);
+
             return this.Results(updatedSession);
         } catch (error) {
+            // If token limit is exceeded, throw the error immediately
+            if (error instanceof ForbiddenException) {
+                this.logger.warn(`Token limit exceeded for user ${user.id}`);
+                return this.HandleError(error);
+            }
+
             // Log error but don't fail the request - transformation service handles fallbacks
-            // If transformation fails, the service returns placeholder data
-            // We still update the session to allow user to proceed
             this.logger.error(`Error generating affirmation: ${error.message}`, error.stack);
 
             // Try to update with whatever we got (even if it's placeholder)
             try {
                 const transformation = await this.nlpTransformationService.transformBelief(
                     session.rawBeliefText,
+                    user.id, // Pass userId for token tracking
                 );
+
+                // Determine if this is the first affirmation
+                const isFirstAffirmation = session.affirmations.length === 0;
+                const nextOrder = session.affirmations.length;
+
+                // Create affirmation even with fallback data
+                const newAffirmation = await this.prisma.affirmation.create({
+                    data: {
+                        sessionId: sessionId,
+                        affirmationText: transformation.generatedAffirmation,
+                        audioUrl: null,
+                        isSelected: isFirstAffirmation,
+                        order: nextOrder,
+                    },
+                });
+
+                const updateData: any = {
+                    limitingBelief: transformation.limitingBelief,
+                    status: 'AFFIRMATION_GENERATED',
+                };
+
+                if (isFirstAffirmation) {
+                    updateData.generatedAffirmation = transformation.generatedAffirmation;
+                }
 
                 const updatedSession = await this.prisma.reflectionSession.update({
                     where: { id: sessionId },
-                    data: {
-                        limitingBelief: transformation.limitingBelief,
-                        generatedAffirmation: transformation.generatedAffirmation,
-                        status: 'AFFIRMATION_GENERATED',
-                    },
+                    data: updateData,
                     include: {
                         category: {
                             select: {
@@ -344,10 +403,12 @@ export class ReflectionService extends BaseService {
                                 name: true,
                             },
                         },
+                        affirmations: {
+                            orderBy: { order: 'asc' },
+                        },
                     },
                 });
 
-                // Add computed affirmationAudioUrl field
                 // Send push notification for affirmation generated
                 try {
                     const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
@@ -668,8 +729,6 @@ export class ReflectionService extends BaseService {
                 },
             });
 
-        
-
             return this.Results(updatedSession);
         } catch (error) {
             return this.HandleError(
@@ -715,8 +774,6 @@ export class ReflectionService extends BaseService {
                 },
             },
         });
-
-        
 
         return this.Results(updatedSession);
     }
@@ -933,7 +990,6 @@ export class ReflectionService extends BaseService {
             },
         });
 
-        
         return this.Results(updatedWave);
     }
 
@@ -1048,6 +1104,245 @@ export class ReflectionService extends BaseService {
             this.logger.error(`Error regenerating affirmation voice: ${error.message}`, error.stack);
             return this.HandleError(
                 new BadRequestException(`Failed to regenerate affirmation voice: ${error.message}`),
+            );
+        }
+    }
+
+    /**
+     * Get all affirmations for a session
+     */
+    async getAffirmations(firebaseId: string, sessionId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Validate session ownership
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        // Get all affirmations for the session
+        const affirmations = await this.prisma.affirmation.findMany({
+            where: {
+                sessionId: sessionId,
+            },
+            orderBy: {
+                order: 'asc',
+            },
+        });
+
+        return this.Results(affirmations);
+    }
+
+    /**
+     * Select an affirmation as the active one for a session
+     */
+    async selectAffirmation(firebaseId: string, sessionId: string, affirmationId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Validate session ownership
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        // Validate affirmation belongs to this session
+        const affirmation = await this.prisma.affirmation.findFirst({
+            where: {
+                id: affirmationId,
+                sessionId: sessionId,
+            },
+        });
+
+        if (!affirmation) {
+            return this.HandleError(
+                new NotFoundException('Affirmation not found or does not belong to this session'),
+            );
+        }
+
+        // Generate audio if this affirmation doesn't have audio yet
+        let audioUrl = affirmation.audioUrl;
+        if (!audioUrl && affirmation.affirmationText) {
+            try {
+                // Get user's voice preference
+                const voicePreference = user.ttsVoicePreference || null;
+
+                audioUrl = await this.textToSpeechService.generateAffirmationAudio(
+                    affirmation.affirmationText,
+                    user.id,
+                    voicePreference,
+                );
+
+                this.logger.log(`Generated audio for affirmation ${affirmationId}`);
+            } catch (ttsError) {
+                this.logger.warn(`TTS generation failed for affirmation ${affirmationId}: ${ttsError.message}. Continuing without audio.`);
+            }
+        }
+
+        // Use a transaction to ensure atomicity
+        try {
+            await this.prisma.$transaction(async (tx) => {
+                // Unmark all other affirmations for this session
+                await tx.affirmation.updateMany({
+                    where: {
+                        sessionId: sessionId,
+                        id: { not: affirmationId },
+                    },
+                    data: {
+                        isSelected: false,
+                    },
+                });
+
+                // Mark the selected affirmation and update audio URL
+                await tx.affirmation.update({
+                    where: { id: affirmationId },
+                    data: {
+                        isSelected: true,
+                        audioUrl: audioUrl, // Update with newly generated audio or existing audio
+                    },
+                });
+
+                // Update session's legacy fields for backward compatibility
+                await tx.reflectionSession.update({
+                    where: { id: sessionId },
+                    data: {
+                        generatedAffirmation: affirmation.affirmationText,
+                        aiAffirmationAudioUrl: audioUrl,
+                    },
+                });
+            });
+
+            // Fetch updated session with affirmations
+            const updatedSession = await this.prisma.reflectionSession.findFirst({
+                where: { id: sessionId },
+                include: {
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                    affirmations: {
+                        orderBy: { order: 'asc' },
+                    },
+                },
+            });
+
+            this.logger.log(`Selected affirmation ${affirmationId} for session ${sessionId}`);
+
+            return this.Results(updatedSession);
+        } catch (error) {
+            this.logger.error(`Error selecting affirmation: ${error.message}`, error.stack);
+            return this.HandleError(
+                new BadRequestException(`Failed to select affirmation: ${error.message}`),
+            );
+        }
+    }
+
+    /**
+     * Delete an affirmation from a session
+     * Cannot delete if it's the only affirmation or if it's currently selected
+     */
+    async deleteAffirmation(firebaseId: string, sessionId: string, affirmationId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        // Validate session ownership
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
+            include: {
+                affirmations: true,
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        // Validate affirmation belongs to this session
+        const affirmation = await this.prisma.affirmation.findFirst({
+            where: {
+                id: affirmationId,
+                sessionId: sessionId,
+            },
+        });
+
+        if (!affirmation) {
+            return this.HandleError(
+                new NotFoundException('Affirmation not found or does not belong to this session'),
+            );
+        }
+
+        // Prevent deletion if it's the only affirmation
+        if (session.affirmations.length === 1) {
+            return this.HandleError(
+                new BadRequestException('Cannot delete the only affirmation. Session must have at least one affirmation.'),
+            );
+        }
+
+        // Prevent deletion if it's the selected affirmation
+        if (affirmation.isSelected) {
+            return this.HandleError(
+                new BadRequestException('Cannot delete the selected affirmation. Please select a different affirmation first.'),
+            );
+        }
+
+        try {
+            // Delete the affirmation
+            await this.prisma.affirmation.delete({
+                where: { id: affirmationId },
+            });
+
+            // TODO: Delete associated audio file from storage if needed
+            // if (affirmation.audioUrl) {
+            //     await this.storageService.deleteFile(affirmation.audioUrl);
+            // }
+
+            this.logger.log(`Deleted affirmation ${affirmationId} from session ${sessionId}`);
+
+            // Return updated session
+            const updatedSession = await this.prisma.reflectionSession.findFirst({
+                where: { id: sessionId },
+                include: {
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                    affirmations: {
+                        orderBy: { order: 'asc' },
+                    },
+                },
+            });
+
+            return this.Results(updatedSession);
+        } catch (error) {
+            this.logger.error(`Error deleting affirmation: ${error.message}`, error.stack);
+            return this.HandleError(
+                new BadRequestException(`Failed to delete affirmation: ${error.message}`),
             );
         }
     }

@@ -608,17 +608,31 @@ export class NotificationsService
       return this.HandleError(new NotFoundException('User not found'));
     }
 
-    await this.prisma.notificationRecipient.update({
-      where: {
-        recipientId_notificationId: {
+    try {
+      const recipient = await this.prisma.notificationRecipient.findFirst({
+        where: {
           recipientId: user.id,
           notificationId,
         },
-      },
-      data: { isRead: true },
-    });
+      });
 
-    return this.Results({ success: true });
+      if (!recipient) {
+        return this.HandleError(new NotFoundException('Notification not found for this user'));
+      }
+
+      await this.prisma.notificationRecipient.update({
+        where: {
+          id: recipient.id,
+        },
+        data: { isRead: true },
+      });
+
+      return this.Results({ success: true });
+    } catch (error) {
+      return this.HandleError(
+        new BadRequestException(`Failed to mark notification as read: ${error.message}`)
+      );
+    }
   }
 
   async markAllNotificationsAsRead(firebaseId: string) {

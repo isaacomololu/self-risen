@@ -17,11 +17,12 @@ import {
   SendBulkNotificationDto,
 } from './dto';
 import { BaseController, FirebaseUser } from 'src/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { auth } from 'firebase-admin';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 
 @ApiTags('Notifications')
+@ApiBearerAuth('firebase')
 @Controller('notifications')
 export class NotificationsController extends BaseController {
   constructor(private readonly notificationsService: NotificationsService) {

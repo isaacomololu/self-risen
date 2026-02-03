@@ -8,6 +8,7 @@ import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 import { ChangeNameDto, ChangeUsernameDto, UploadAvatarDto, ChangeTtsVoicePreferenceDto, StreakCalendarQueryDto, StreakChartQueryDto } from './dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StreakService } from 'src/common/services/streak.service';
+import { TokenUsageService } from './token-usage.service';
 
 @UseGuards(FirebaseGuard)
 @ApiBearerAuth('firebase')
@@ -16,6 +17,7 @@ export class UserController extends BaseController {
   constructor(
     private readonly userService: UserService,
     private readonly streakService: StreakService,
+    private readonly tokenUsageService: TokenUsageService,
   ) {
     super();
   }
@@ -471,5 +473,43 @@ export class UserController extends BaseController {
       message: 'Voice persona preference updated',
       data: updatedUser.data,
     })
+  }
+
+  @Get('token-usage')
+  @ApiOperation({
+    summary: 'Get token usage statistics',
+    description: 'Returns the current token usage for the authenticated user, including tokens used this month, remaining tokens, monthly limit, and days until reset.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token usage statistics retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Token usage retrieved' },
+        data: {
+          type: 'object',
+          properties: {
+            tokensUsedThisMonth: { type: 'number', example: 15000 },
+            tokenLimitPerMonth: { type: 'number', example: 30000 },
+            tokensRemaining: { type: 'number', example: 15000 },
+            usagePercentage: { type: 'number', example: 30.0 },
+            resetDate: { type: 'string', format: 'date-time', example: '2026-03-01T00:00:00.000Z' },
+            daysUntilReset: { type: 'number', example: 25 },
+          },
+        },
+      },
+    },
+  })
+  async getTokenUsage(@FirebaseUser() user: auth.DecodedIdToken) {
+    const dbUser = await this.userService.getUserProfile(user.uid);
+    if (dbUser.isError) throw dbUser.error;
+
+    const tokenUsage = await this.tokenUsageService.getTokenUsage(dbUser.data.id);
+
+    return this.response({
+      message: 'Token usage retrieved',
+      data: tokenUsage,
+    });
   }
 }

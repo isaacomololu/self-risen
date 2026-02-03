@@ -10,6 +10,7 @@ import { TextToSpeechService } from './services/text-to-speech.service';
 import { SessionExpirationService } from './services/session-expiration.service';
 import { CommonModule } from 'src/common/common.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
+import { UserModule } from 'src/user/user.module';
 
 @Module({
     imports: [
@@ -17,6 +18,7 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
         DatabaseModule,
         StorageModule,
         NotificationsModule,
+        UserModule, // Import to access TokenUsageService
         ScheduleModule.forRoot()
     ],
     controllers: [ReflectionController],

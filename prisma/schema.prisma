@@ -14,27 +14,30 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(uuid(4))
-  firebaseId         String              @unique
-  name               String
-  username           String?
+  id                  String              @id @default(uuid(4))
+  firebaseId          String              @unique
+  name                String
+  username            String?
   // password        String
-  email              String              @unique
-  avatar             String?
-  fcmTokens          String[]            @default([])
-  streak             Int                 @default(0)
-  sessions           Int                 @default(0)
-  lastStreakDate     DateTime?
-  lastLoggedInAt     DateTime?
-  lastLoggedOutAt    DateTime?
-  ttsVoicePreference TtsVoicePreference? @default(ANDROGYNOUS_CALM)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  wheelOfLife        WheelOfLife?
-  reflectionSessions ReflectionSession[]
-  visionBoards       VisionBoard[]
-  journals           Journal[]
-  streakHistory      StreakHistory[]
+  email               String              @unique
+  avatar              String?
+  fcmTokens           String[]            @default([])
+  streak              Int                 @default(0)
+  sessions            Int                 @default(0)
+  lastStreakDate      DateTime?
+  lastLoggedInAt      DateTime?
+  lastLoggedOutAt     DateTime?
+  ttsVoicePreference  TtsVoicePreference? @default(ANDROGYNOUS_CALM)
+  tokensUsedThisMonth Int                 @default(0)
+  tokenLimitPerMonth  Int                 @default(30000) // Default limit: 30k tokens per month
+  tokenResetDate      DateTime            @default(now())
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  wheelOfLife         WheelOfLife?
+  reflectionSessions  ReflectionSession[]
+  visionBoards        VisionBoard[]
+  journals            Journal[]
+  streakHistory       StreakHistory[]
 }
 
 model StreakHistory {
@@ -234,6 +237,7 @@ model ReflectionSession {
   completedAt             DateTime?
   vision                  Vision?
   waves                   Wave[]
+  affirmations            Affirmation[]
 
   @@index([userId])
   @@index([categoryId])
@@ -255,6 +259,22 @@ model Wave {
 
   @@index([sessionId, isActive])
   @@index([endDate, isActive])
+}
+
+model Affirmation {
+  id              String            @id @default(uuid())
+  sessionId       String
+  session         ReflectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  affirmationText String
+  audioUrl        String?
+  isSelected      Boolean           @default(false)
+  order           Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([sessionId])
+  @@index([sessionId, isSelected])
+  @@index([sessionId, order])
 }
 
 model VisionBoard {
@@ -337,14 +357,14 @@ enum ReflectionSessionStatus {
 
 enum TtsVoicePreference {
   // Male Personas
-  MALE_CONFIDENT      // Onyx - Deep, authoritative, grounding
-  MALE_FRIENDLY       // Echo - Warm, conversational, supportive
-  
+  MALE_CONFIDENT // Onyx - Deep, authoritative, grounding
+  MALE_FRIENDLY // Echo - Warm, conversational, supportive
+
   // Female Personas
-  FEMALE_EMPATHETIC   // Nova - Nurturing, warm, compassionate
-  FEMALE_ENERGETIC    // Shimmer - Upbeat, vibrant, motivating
-  
+  FEMALE_EMPATHETIC // Nova - Nurturing, warm, compassionate
+  FEMALE_ENERGETIC // Shimmer - Upbeat, vibrant, motivating
+
   // Androgynous Personas
-  ANDROGYNOUS_CALM    // Alloy - Balanced, neutral, steady
-  ANDROGYNOUS_WISE    // Fable - Thoughtful, mature, grounded
+  ANDROGYNOUS_CALM // Alloy - Balanced, neutral, steady
+  ANDROGYNOUS_WISE // Fable - Thoughtful, mature, grounded
 }

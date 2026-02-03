@@ -47,7 +47,14 @@ export class UserService extends BaseService {
 
   async getUserProfile(firebaseId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { firebaseId }
+      where: { firebaseId },
+      include: {
+        _count: {
+          select: {
+            reflectionSessions: true,
+          }
+        }
+      }
     });
 
     if (!user) {
@@ -57,7 +64,23 @@ export class UserService extends BaseService {
     };
 
     const enrichedUser = this.enrichUserWithPersonaDetails(user);
-    return this.Results(enrichedUser);
+    
+    // Add token usage summary
+    const now = new Date();
+    const resetDate = new Date(user.tokenResetDate);
+    const daysUntilReset = Math.max(0, Math.ceil((resetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    
+    return this.Results({
+      ...enrichedUser,
+      tokenUsage: {
+        tokensUsedThisMonth: user.tokensUsedThisMonth,
+        tokenLimitPerMonth: user.tokenLimitPerMonth,
+        tokensRemaining: Math.max(0, user.tokenLimitPerMonth - user.tokensUsedThisMonth),
+        usagePercentage: Math.round((user.tokensUsedThisMonth / user.tokenLimitPerMonth) * 10000) / 100,
+        resetDate: user.tokenResetDate,
+        daysUntilReset,
+      }
+    });
   }
 
   async changeName(firebaseId: string, payload: ChangeNameDto) {

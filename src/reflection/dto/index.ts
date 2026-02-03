@@ -8,4 +8,5 @@ export { UpdateWaveDto } from './update-wave.dto';
 export { RegenerateVoiceDto } from './regenerate-voice.dto';
 export { EditAffirmationDto } from './edit-affirmation.dto';
 export { EditBeliefDto } from './edit-belief.dto';
+export { AffirmationResponseDto } from './affirmation-response.dto';
 

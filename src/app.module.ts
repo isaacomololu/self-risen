@@ -39,7 +39,7 @@ import { StaterVideosModule } from './stater-videos/stater-videos.module';
               config: {
                 extractor: ExtractJwt.fromAuthHeaderAsBearerToken(),
                 checkRevoked: true,
-                validateRole: true,
+                validateRole: false,
               },
             },
           };
@@ -88,7 +88,7 @@ import { StaterVideosModule } from './stater-videos/stater-videos.module';
                   config: {
                     extractor: ExtractJwt.fromAuthHeaderAsBearerToken(),
                     checkRevoked: true,
-                    validateRole: true,
+                    validateRole: false,
                   },
                 },
               };
@@ -170,7 +170,7 @@ import { StaterVideosModule } from './stater-videos/stater-videos.module';
               config: {
                 extractor: ExtractJwt.fromAuthHeaderAsBearerToken(),
                 checkRevoked: true,
-                validateRole: true,
+                validateRole: false,
               },
             },
           };

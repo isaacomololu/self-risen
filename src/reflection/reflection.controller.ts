@@ -606,5 +606,120 @@ export class ReflectionController extends BaseController {
             data: result.data,
         });
     }
+
+    @Get('sessions/:sessionId/affirmations')
+    @ApiOperation({
+        summary: 'Get all affirmations for a session',
+        description: 'Retrieves all generated affirmations for a reflection session, ordered by creation.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmations retrieved successfully',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Reflection session not found',
+    })
+    async getAffirmations(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+    ) {
+        const result = await this.reflectionService.getAffirmations(user.uid, sessionId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Affirmations retrieved successfully',
+            data: result.data,
+        });
+    }
+
+    @Patch('sessions/:sessionId/affirmations/:affirmationId/select')
+    @ApiOperation({
+        summary: 'Select an affirmation as active',
+        description: 'Marks the specified affirmation as the active/selected one for this session. Unselects any previously selected affirmation.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiParam({
+        name: 'affirmationId',
+        description: 'The unique identifier of the affirmation to select',
+        example: 'affirmation-id-123',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmation selected successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Invalid request',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Reflection session or affirmation not found',
+    })
+    async selectAffirmation(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+        @Param('affirmationId') affirmationId: string,
+    ) {
+        const result = await this.reflectionService.selectAffirmation(user.uid, sessionId, affirmationId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Affirmation selected successfully',
+            data: result.data,
+        });
+    }
+
+    @Delete('sessions/:sessionId/affirmations/:affirmationId')
+    @ApiOperation({
+        summary: 'Delete an affirmation',
+        description: 'Removes an affirmation from the session. Cannot delete if it\'s the only affirmation or if it\'s currently selected.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiParam({
+        name: 'affirmationId',
+        description: 'The unique identifier of the affirmation to delete',
+        example: 'affirmation-id-123',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmation deleted successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description: 'Cannot delete the only affirmation or the selected affirmation',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Reflection session or affirmation not found',
+    })
+    async deleteAffirmation(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+        @Param('affirmationId') affirmationId: string,
+    ) {
+        const result = await this.reflectionService.deleteAffirmation(user.uid, sessionId, affirmationId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Affirmation deleted successfully',
+            data: result.data,
+        });
+    }
 }
 
