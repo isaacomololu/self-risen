@@ -92,8 +92,8 @@ export class NotificationsController extends BaseController {
     @Query('perPage') perPage?: string,
     @Query('unreadOnly') unreadOnly?: string,
   ) {
-    const pageNumber = page ? parseInt(page, 10) : 1;
-    const perPageNumber = perPage ? parseInt(perPage, 10) : 10;
+    const pageNumber = Math.max(1, parseInt(String(page || '1'), 10) || 1);
+    const perPageNumber = Math.min(100, Math.max(1, parseInt(String(perPage || '10'), 10) || 10));
     const unreadOnlyFlag = unreadOnly === 'true';
 
     const result = await this.notificationsService.getUserNotifications(

@@ -560,12 +560,12 @@ export class NotificationsService
       return this.HandleError(new NotFoundException('User not found'));
     }
 
-    const pageNumber = Math.max(1, Math.floor(page));
-    const perPageNumber = Math.max(1, Math.min(100, Math.floor(perPage)));
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const perPageNumber = Math.max(1, Math.min(100, Number(perPage) || 10));
     const skip = (pageNumber - 1) * perPageNumber;
 
     // Build where clause with optional unreadOnly filter
-    const whereClause: any = { recipientId: user.id };
+    const whereClause: { recipientId: string; isRead?: boolean } = { recipientId: user.id };
     if (unreadOnly) {
       whereClause.isRead = false;
     }
@@ -573,7 +573,23 @@ export class NotificationsService
     const [recipients, totalCount] = await Promise.all([
       this.prisma.notificationRecipient.findMany({
         where: whereClause,
-        include: { notification: true },
+        include: {
+          notification: {
+            select: {
+              id: true,
+              type: true,
+              title: true,
+              body: true,
+              channels: true,
+              meta: true,
+              createdAt: true,
+              iconUrl: true,
+              resourceId: true,
+              resourceType: true,
+              deepLink: true,
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
         take: perPageNumber,
         skip,
