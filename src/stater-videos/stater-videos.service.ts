@@ -60,6 +60,16 @@ export class StaterVideosService extends BaseService {
         return this.Results({ light, dark });
     }
 
+    async getMusicUrls() {
+        const musicUrls = [
+            {
+                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/audios/affirmations/user-recorded/51c20a08-c95e-4673-854a-8ed327997681/94b9b87c-bc23-446b-852d-e73da570c5ee-1768564623517.m4a',
+                name: 'bright-glow'
+            }
+        ];
+        return this.Results(musicUrls);
+    }
+
     // async getAllSessions(
     //     page: number = 1,
     //     limit: number = 10,

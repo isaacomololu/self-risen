@@ -20,6 +20,17 @@ export class StaterVideosController extends BaseController {
         });
     }
 
+    @Get('music')
+    async getMusicUrls() {
+        const result = await this.staterVideosService.getMusicUrls();
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Music URLs retrieved',
+            data: result.data,
+        });
+    }
+
     // @Get('sessions')
     // async getAllSessions(
     //     @Query('page') page?: string,

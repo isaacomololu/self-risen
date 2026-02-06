@@ -236,7 +236,7 @@ export class ReflectionService extends BaseService {
             },
             include: {
                 affirmations: {
-                    orderBy: { order: 'asc' },
+                    orderBy: { createdAt: 'desc' },
                 },
             },
         });
@@ -321,7 +321,7 @@ export class ReflectionService extends BaseService {
                         },
                     },
                     affirmations: {
-                        orderBy: { order: 'asc' },
+                        orderBy: { createdAt: 'desc' },
                     },
                 },
             });
@@ -404,7 +404,7 @@ export class ReflectionService extends BaseService {
                             },
                         },
                         affirmations: {
-                            orderBy: { order: 'asc' },
+                            orderBy: { createdAt: 'desc' },
                         },
                     },
                 });
@@ -1135,7 +1135,7 @@ export class ReflectionService extends BaseService {
                 sessionId: sessionId,
             },
             orderBy: {
-                order: 'asc',
+                createdAt: 'desc',
             },
         });
 
@@ -1240,7 +1240,7 @@ export class ReflectionService extends BaseService {
                         },
                     },
                     affirmations: {
-                        orderBy: { order: 'asc' },
+                        orderBy: { createdAt: 'desc' },
                     },
                 },
             });
@@ -1333,7 +1333,7 @@ export class ReflectionService extends BaseService {
                         },
                     },
                     affirmations: {
-                        orderBy: { order: 'asc' },
+                        orderBy: { createdAt: 'desc' },
                     },
                 },
             });
