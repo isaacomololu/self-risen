@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class EditAffirmationDto {
@@ -12,4 +12,16 @@ export class EditAffirmationDto {
     @IsNotEmpty()
     @MaxLength(500)
     affirmation: string;
+
+    @ApiProperty({
+        required: false,
+        type: 'string',
+        enum: ['Sage', 'Phoenix', 'River', 'Quinn', 'Alex', 'Robin'],
+        enumName: 'PersonaName',
+        description: 'Optional voice for this affirmation. If provided, regenerated audio will use this voice and it is stored on the affirmation without changing the user\'s default.',
+    })
+    @IsOptional()
+    @IsString()
+    @IsIn(['Sage', 'Phoenix', 'River', 'Quinn', 'Alex', 'Robin'])
+    voicePreference?: string;
 }

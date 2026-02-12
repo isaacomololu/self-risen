@@ -18,7 +18,7 @@ export class CreateWaveDto {
         enum: [1, 3, 7, 14, 30]
     })
     @IsInt()
-    @IsIn([1, 3, 7, 14, 30])
+    @IsIn([1, 3, 7, 14, 30, 21, 60])
     @Min(1)
     durationDays: number;
 

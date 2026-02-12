@@ -368,42 +368,16 @@ export class UserController extends BaseController {
     schema: {
       type: 'object',
       properties: {
-        male: {
+        personas: {
           type: 'array',
           items: {
             type: 'object',
             properties: {
-              name: { type: 'string', example: 'Marcus' },
-              displayName: { type: 'string', example: 'Marcus (Confident Coach - Male)' },
-              gender: { type: 'string', example: 'male' },
-              description: { type: 'string', example: 'Deep, authoritative voice that commands attention' },
-              personality: { type: 'array', items: { type: 'string' }, example: ['authoritative', 'grounding', 'powerful'] }
-            }
-          }
-        },
-        female: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', example: 'Sophia' },
-              displayName: { type: 'string', example: 'Sophia (Empathetic Mentor - Female)' },
-              gender: { type: 'string', example: 'female' },
+              name: { type: 'string', example: 'Sage' },
+              displayName: { type: 'string', example: 'Sage (Empathetic Mentor)' },
               description: { type: 'string', example: 'Nurturing, warm voice that radiates compassion' },
-              personality: { type: 'array', items: { type: 'string' }, example: ['nurturing', 'compassionate'] }
-            }
-          }
-        },
-        androgynous: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', example: 'Alex' },
-              displayName: { type: 'string', example: 'Alex (Calm Companion - Androgynous)' },
-              gender: { type: 'string', example: 'androgynous' },
-              description: { type: 'string', example: 'Balanced, neutral voice that brings steadiness' },
-              personality: { type: 'array', items: { type: 'string' }, example: ['balanced', 'neutral'] }
+              personality: { type: 'array', items: { type: 'string' }, example: ['nurturing', 'compassionate'] },
+              preference: { type: 'string', example: 'FEMALE_EMPATHETIC' }
             }
           }
         }
@@ -429,35 +403,35 @@ export class UserController extends BaseController {
   @ApiBody({
     type: ChangeTtsVoicePreferenceDto,
     examples: {
-      marcus: {
-        summary: 'Marcus (Confident Coach)',
-        value: { ttsVoicePreference: 'Marcus' },
-        description: 'Deep, authoritative voice that commands attention. Personality: authoritative, grounding, powerful, commanding.'
+      sage: {
+        summary: 'Sage (Empathetic Mentor)',
+        value: { ttsVoicePreference: 'Sage' },
+        description: 'Nurturing, warm voice that radiates compassion.'
       },
-      daniel: {
-        summary: 'Daniel (Friendly Guide)',
-        value: { ttsVoicePreference: 'Daniel' },
-        description: 'Warm, conversational voice that feels approachable. Personality: approachable, supportive, encouraging, relatable.'
+      phoenix: {
+        summary: 'Phoenix (Energetic Motivator)',
+        value: { ttsVoicePreference: 'Phoenix' },
+        description: 'Upbeat, vibrant voice that inspires action.'
       },
-      sophia: {
-        summary: 'Sophia (Empathetic Mentor)',
-        value: { ttsVoicePreference: 'Sophia' },
-        description: 'Nurturing, warm voice that radiates compassion. Personality: nurturing, compassionate, understanding, gentle.'
+      river: {
+        summary: 'River (Confident Coach)',
+        value: { ttsVoicePreference: 'River' },
+        description: 'Deep, authoritative voice that commands attention.'
       },
-      maya: {
-        summary: 'Maya (Energetic Motivator)',
-        value: { ttsVoicePreference: 'Maya' },
-        description: 'Upbeat, vibrant voice that inspires action. Personality: upbeat, vibrant, motivating, enthusiastic.'
+      quinn: {
+        summary: 'Quinn (Friendly Guide)',
+        value: { ttsVoicePreference: 'Quinn' },
+        description: 'Warm, conversational voice that feels approachable.'
       },
       alex: {
         summary: 'Alex (Calm Companion)',
         value: { ttsVoicePreference: 'Alex' },
-        description: 'Balanced, neutral voice that brings steadiness. Personality: balanced, neutral, steady, peaceful.'
+        description: 'Balanced, neutral voice that brings steadiness.'
       },
-      river: {
-        summary: 'River (Wise Advisor)',
-        value: { ttsVoicePreference: 'River' },
-        description: 'Thoughtful, mature voice that conveys wisdom. Personality: thoughtful, mature, grounded, insightful.'
+      robin: {
+        summary: 'Robin (Wise Advisor)',
+        value: { ttsVoicePreference: 'Robin' },
+        description: 'Thoughtful, mature voice that conveys wisdom.'
       }
     }
   })

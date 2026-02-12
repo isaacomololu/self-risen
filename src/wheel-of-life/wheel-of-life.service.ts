@@ -16,13 +16,13 @@ import {
 export class WheelOfLifeService extends BaseService {
     private readonly DEFAULT_CATEGORIES = [
         'Health & Well-being',
-        'Relationships',
-        'Career / Work',
-        'Finances',
+        'Relationships & Intimacy',
+        'Career & Work',
+        'Finances Management',
+        'Spirituality',
         'Personal Growth',
         'Leisure & Fun',
-        'Environment',
-        'Spirituality / Mindfulness',
+        'Community Service',
     ];
 
     constructor(private prisma: DatabaseProvider) {

@@ -21,43 +21,43 @@ export class TextToSpeechService extends BaseService {
     private openai: OpenAI;
 
     private readonly PERSONA_MAPPING: Record<TtsVoicePreference, PersonaConfig> = {
-        // Male Personas
+        // Male (internal mapping only; not shown in UI)
         [TtsVoicePreference.MALE_CONFIDENT]: {
             openAiVoice: 'onyx',
             gender: 'male',
-            name: 'Marcus',
-            displayName: 'Marcus (Confident Coach)',
+            name: 'River',
+            displayName: 'River (Confident Coach)',
             description: 'Deep, authoritative voice that commands attention',
             personality: ['authoritative', 'grounding', 'powerful', 'commanding']
         },
         [TtsVoicePreference.MALE_FRIENDLY]: {
             openAiVoice: 'echo',
             gender: 'male',
-            name: 'Daniel',
-            displayName: 'Daniel (Friendly Guide)',
+            name: 'Quinn',
+            displayName: 'Quinn (Friendly Guide)',
             description: 'Warm, conversational voice that feels approachable',
             personality: ['approachable', 'supportive', 'encouraging', 'relatable']
         },
 
-        // Female Personas
+        // Female (internal mapping only; not shown in UI)
         [TtsVoicePreference.FEMALE_EMPATHETIC]: {
             openAiVoice: 'nova',
             gender: 'female',
-            name: 'Sophia',
-            displayName: 'Sophia (Empathetic Mentor)',
+            name: 'Sage',
+            displayName: 'Sage (Empathetic Mentor)',
             description: 'Nurturing, warm voice that radiates compassion',
             personality: ['nurturing', 'compassionate', 'understanding', 'gentle']
         },
         [TtsVoicePreference.FEMALE_ENERGETIC]: {
             openAiVoice: 'shimmer',
             gender: 'female',
-            name: 'Maya',
-            displayName: 'Maya (Energetic Motivator)',
+            name: 'Phoenix',
+            displayName: 'Phoenix (Energetic Motivator)',
             description: 'Upbeat, vibrant voice that inspires action',
             personality: ['upbeat', 'vibrant', 'motivating', 'enthusiastic']
         },
 
-        // Androgynous Personas
+        // Other
         [TtsVoicePreference.ANDROGYNOUS_CALM]: {
             openAiVoice: 'alloy',
             gender: 'androgynous',
@@ -69,8 +69,8 @@ export class TextToSpeechService extends BaseService {
         [TtsVoicePreference.ANDROGYNOUS_WISE]: {
             openAiVoice: 'fable',
             gender: 'androgynous',
-            name: 'River',
-            displayName: 'River (Wise Advisor)',
+            name: 'Robin',
+            displayName: 'Robin (Wise Advisor)',
             description: 'Thoughtful, mature voice that conveys wisdom',
             personality: ['thoughtful', 'mature', 'grounded', 'insightful']
         }
@@ -78,12 +78,12 @@ export class TextToSpeechService extends BaseService {
 
     // Name to enum mapping for easy lookup
     private readonly NAME_TO_ENUM: Record<string, TtsVoicePreference> = {
-        'Marcus': TtsVoicePreference.MALE_CONFIDENT,
-        'Daniel': TtsVoicePreference.MALE_FRIENDLY,
-        'Sophia': TtsVoicePreference.FEMALE_EMPATHETIC,
-        'Maya': TtsVoicePreference.FEMALE_ENERGETIC,
+        'Sage': TtsVoicePreference.FEMALE_EMPATHETIC,
+        'Phoenix': TtsVoicePreference.FEMALE_ENERGETIC,
+        'River': TtsVoicePreference.MALE_CONFIDENT,
+        'Quinn': TtsVoicePreference.MALE_FRIENDLY,
         'Alex': TtsVoicePreference.ANDROGYNOUS_CALM,
-        'River': TtsVoicePreference.ANDROGYNOUS_WISE,
+        'Robin': TtsVoicePreference.ANDROGYNOUS_WISE,
     };
 
     constructor(private storageService: StorageService) {

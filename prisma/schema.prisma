@@ -262,15 +262,16 @@ model Wave {
 }
 
 model Affirmation {
-  id              String            @id @default(uuid())
-  sessionId       String
-  session         ReflectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  affirmationText String
-  audioUrl        String?
-  isSelected      Boolean           @default(false)
-  order           Int               @default(0)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                 String             @id @default(uuid())
+  sessionId          String
+  session            ReflectionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  affirmationText    String
+  audioUrl           String?
+  isSelected         Boolean            @default(false)
+  order              Int                @default(0)
+  ttsVoicePreference TtsVoicePreference?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@index([sessionId])
   @@index([sessionId, isSelected])

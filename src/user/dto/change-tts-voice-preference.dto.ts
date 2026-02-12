@@ -5,23 +5,14 @@ export class ChangeTtsVoicePreferenceDto {
     @ApiProperty({ 
         required: true,
         type: 'string',
-        enum: ['Marcus', 'Daniel', 'Sophia', 'Maya', 'Alex', 'River'],
+        enum: ['Sage', 'Phoenix', 'River', 'Quinn', 'Alex', 'Robin'],
         enumName: 'PersonaName',
-        description: 'Voice persona name for text-to-speech affirmations. Available personas:\n\n' +
-                     '**Male Personas:**\n' +
-                     '- **Marcus** (Confident Coach - Male): Deep, authoritative voice that commands attention. Personality: authoritative, grounding, powerful, commanding.\n' +
-                     '- **Daniel** (Friendly Guide - Male): Warm, conversational voice that feels approachable. Personality: approachable, supportive, encouraging, relatable.\n\n' +
-                     '**Female Personas:**\n' +
-                     '- **Sophia** (Empathetic Mentor - Female): Nurturing, warm voice that radiates compassion. Personality: nurturing, compassionate, understanding, gentle.\n' +
-                     '- **Maya** (Energetic Motivator - Female): Upbeat, vibrant voice that inspires action. Personality: upbeat, vibrant, motivating, enthusiastic.\n\n' +
-                     '**Androgynous Personas:**\n' +
-                     '- **Alex** (Calm Companion - Androgynous): Balanced, neutral voice that brings steadiness. Personality: balanced, neutral, steady, peaceful.\n' +
-                     '- **River** (Wise Advisor - Androgynous): Thoughtful, mature voice that conveys wisdom. Personality: thoughtful, mature, grounded, insightful.',
-        example: 'Sophia'
+        description: 'Voice persona name for text-to-speech affirmations. Available: Sage (Empathetic Mentor), Phoenix (Energetic Motivator), River (Confident Coach), Quinn (Friendly Guide), Alex (Calm Companion), Robin (Wise Advisor).',
+        example: 'Sage'
     })
     @IsNotEmpty()
     @IsString()
-    @IsIn(['Marcus', 'Daniel', 'Sophia', 'Maya', 'Alex', 'River'])
+    @IsIn(['Sage', 'Phoenix', 'River', 'Quinn', 'Alex', 'Robin'])
     ttsVoicePreference: string;
 }
 

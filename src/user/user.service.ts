@@ -32,7 +32,6 @@ export class UserService extends BaseService {
       ttsVoicePersona: personaDetails ? {
         name: personaDetails.name,
         displayName: personaDetails.displayName,
-        gender: personaDetails.gender,
         description: personaDetails.description,
         personality: personaDetails.personality
       } : null
@@ -235,12 +234,12 @@ export class UserService extends BaseService {
 
     // Convert persona name to enum value
     const nameToEnumMap: Record<string, string> = {
-      'Marcus': 'MALE_CONFIDENT',
-      'Daniel': 'MALE_FRIENDLY',
-      'Sophia': 'FEMALE_EMPATHETIC',
-      'Maya': 'FEMALE_ENERGETIC',
+      'Sage': 'FEMALE_EMPATHETIC',
+      'Phoenix': 'FEMALE_ENERGETIC',
+      'River': 'MALE_CONFIDENT',
+      'Quinn': 'MALE_FRIENDLY',
       'Alex': 'ANDROGYNOUS_CALM',
-      'River': 'ANDROGYNOUS_WISE',
+      'Robin': 'ANDROGYNOUS_WISE',
     };
 
     const enumValue = nameToEnumMap[ttsVoicePreference];
@@ -263,32 +262,19 @@ export class UserService extends BaseService {
 
   async getAvailablePersonas() {
     const allPersonas = this.textToSpeechService.getAllPersonas();
-    
-    // Transform the data to be more frontend-friendly
-    const formattedPersonas = {
-      male: allPersonas.male.map(p => ({
-        name: p.config.name,
-        displayName: p.config.displayName,
-        gender: p.config.gender,
-        description: p.config.description,
-        personality: p.config.personality
-      })),
-      female: allPersonas.female.map(p => ({
-        name: p.config.name,
-        displayName: p.config.displayName,
-        gender: p.config.gender,
-        description: p.config.description,
-        personality: p.config.personality
-      })),
-      androgynous: allPersonas.androgynous.map(p => ({
-        name: p.config.name,
-        displayName: p.config.displayName,
-        gender: p.config.gender,
-        description: p.config.description,
-        personality: p.config.personality
-      }))
-    };
+    // Flat list; gender not exposed in API (personas shown without gender labels)
+    const personas = [
+      ...allPersonas.female,
+      ...allPersonas.male,
+      ...allPersonas.androgynous,
+    ].map(p => ({
+      name: p.config.name,
+      displayName: p.config.displayName,
+      description: p.config.description,
+      personality: p.config.personality,
+      preference: p.preference,
+    }));
 
-    return this.Results(formattedPersonas);
+    return this.Results({ personas });
   }
 }

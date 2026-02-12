@@ -29,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { ReflectionService } from './reflection.service';
-import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, EditAffirmationDto, EditBeliefDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, VoicePreferenceDto, EditAffirmationDto, EditBeliefDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -175,13 +175,14 @@ export class ReflectionController extends BaseController {
     @Post('sessions/:sessionId/generate-affirmation')
     @ApiOperation({
         summary: 'Generate affirmation from belief',
-        description: 'Transforms the user\'s limiting belief into an empowering affirmation using AI. Session must be in BELIEF_CAPTURED status.',
+        description: 'Transforms the user\'s limiting belief into an empowering affirmation using AI. Session must be in BELIEF_CAPTURED status. Optional voice is stored on the affirmation and does not change the user\'s default.',
     })
     @ApiParam({
         name: 'sessionId',
         description: 'The unique identifier of the reflection session',
         example: 'session-id-123',
     })
+    @ApiBody({ type: VoicePreferenceDto, required: false })
     @ApiResponse({
         status: 200,
         description: 'Affirmation generated successfully',
@@ -202,8 +203,9 @@ export class ReflectionController extends BaseController {
     async generateAffirmation(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('sessionId') sessionId: string,
+        @Body() dto?: VoicePreferenceDto,
     ) {
-        const result = await this.reflectionService.generateAffirmation(user.uid, sessionId);
+        const result = await this.reflectionService.generateAffirmation(user.uid, sessionId, dto);
         if (result.isError) throw result.error;
 
         return this.response({

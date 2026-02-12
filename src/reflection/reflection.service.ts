@@ -5,7 +5,7 @@ import { StorageService, FileType } from 'src/common/storage/storage.service';
 import { TranscriptionService } from './services/transcription.service';
 import { NlpTransformationService } from './services/nlp-transformation.service';
 import { TextToSpeechService } from './services/text-to-speech.service';
-import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, EditAffirmationDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, VoicePreferenceDto, EditAffirmationDto } from './dto';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
 import { NotificationTypeEnum, NotificationChannelTypeEnum } from 'src/notifications/enums/notification.enum';
 import { randomUUID } from 'crypto';
@@ -220,9 +220,10 @@ export class ReflectionService extends BaseService {
 
     /**
      * Generate affirmation from belief using NLP transformation
-     * Now creates a new Affirmation record instead of just updating the session
+     * Now creates a new Affirmation record instead of just updating the session.
+     * Optional voicePreference is stored on the affirmation so it keeps this voice even if the user changes their default.
      */
-    async generateAffirmation(firebaseId: string, sessionId: string) {
+    async generateAffirmation(firebaseId: string, sessionId: string, dto?: VoicePreferenceDto) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));
@@ -269,17 +270,20 @@ export class ReflectionService extends BaseService {
             const isFirstAffirmation = session.affirmations.length === 0;
             const nextOrder = session.affirmations.length;
 
+            // Resolve voice: optional per-affirmation override or user default; store enum on affirmation
+            const voiceForTts = dto?.voicePreference
+                ? (this.textToSpeechService.convertNameToEnum(dto.voicePreference) ?? user.ttsVoicePreference)
+                : user.ttsVoicePreference;
+            const voiceToStore = voiceForTts ?? null;
+
             // Only generate audio if this is the first affirmation (which will be auto-selected)
             let audioUrl: string | null = null;
             if (isFirstAffirmation && transformation.generatedAffirmation) {
                 try {
-                    // Get user's voice preference
-                    const voicePreference = user.ttsVoicePreference || null;
-
                     audioUrl = await this.textToSpeechService.generateAffirmationAudio(
                         transformation.generatedAffirmation,
                         user.id,
-                        voicePreference,
+                        voiceForTts ?? undefined,
                     );
                 } catch (ttsError) {
                     this.logger.warn(`TTS generation failed: ${ttsError.message}. Continuing without audio.`);
@@ -294,6 +298,7 @@ export class ReflectionService extends BaseService {
                     audioUrl,
                     isSelected: isFirstAffirmation, // First affirmation is auto-selected
                     order: nextOrder,
+                    ttsVoicePreference: voiceToStore,
                 },
             });
 
@@ -373,7 +378,10 @@ export class ReflectionService extends BaseService {
                 const isFirstAffirmation = session.affirmations.length === 0;
                 const nextOrder = session.affirmations.length;
 
-                // Create affirmation even with fallback data
+                const voiceForTtsFallback = dto?.voicePreference
+                    ? (this.textToSpeechService.convertNameToEnum(dto.voicePreference) ?? user.ttsVoicePreference)
+                    : user.ttsVoicePreference;
+                // Create affirmation even with fallback data (store voice for when audio is generated later)
                 const newAffirmation = await this.prisma.affirmation.create({
                     data: {
                         sessionId: sessionId,
@@ -381,6 +389,7 @@ export class ReflectionService extends BaseService {
                         audioUrl: null,
                         isSelected: isFirstAffirmation,
                         order: nextOrder,
+                        ttsVoicePreference: voiceForTtsFallback ?? null,
                     },
                 });
 
@@ -466,6 +475,9 @@ export class ReflectionService extends BaseService {
                         name: true,
                     },
                 },
+                affirmations: {
+                    where: { isSelected: true },
+                },
             },
         });
 
@@ -494,6 +506,22 @@ export class ReflectionService extends BaseService {
             );
         }
 
+        const selectedAffirmation = session.affirmations[0];
+        const voiceToStore = dto.voicePreference
+            ? (this.textToSpeechService.convertNameToEnum(dto.voicePreference) ?? undefined)
+            : undefined;
+
+        if (selectedAffirmation) {
+            await this.prisma.affirmation.update({
+                where: { id: selectedAffirmation.id },
+                data: {
+                    affirmationText: trimmedAffirmation,
+                    audioUrl: null,
+                    ...(voiceToStore !== undefined && { ttsVoicePreference: voiceToStore }),
+                },
+            });
+        }
+
         const updatedSession = await this.prisma.reflectionSession.update({
             where: { id: sessionId },
             data: {
@@ -506,6 +534,9 @@ export class ReflectionService extends BaseService {
                         id: true,
                         name: true,
                     },
+                },
+                affirmations: {
+                    orderBy: { createdAt: 'desc' },
                 },
             },
         });
@@ -1048,14 +1079,21 @@ export class ReflectionService extends BaseService {
                 id: sessionId,
                 userId: user.id,
             },
+            include: {
+                affirmations: {
+                    where: { isSelected: true },
+                },
+            },
         });
 
         if (!session) {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        // Only regenerate if affirmation exists
-        if (!session.generatedAffirmation || session.generatedAffirmation.trim().length === 0) {
+        // Only regenerate if affirmation exists (session legacy or selected affirmation)
+        const selectedAffirmation = session.affirmations[0];
+        const affirmationText = selectedAffirmation?.affirmationText ?? session.generatedAffirmation;
+        if (!affirmationText || affirmationText.trim().length === 0) {
             return this.HandleError(
                 new BadRequestException('Cannot regenerate voice. No generated affirmation found in session.'),
             );
@@ -1071,17 +1109,27 @@ export class ReflectionService extends BaseService {
         }
 
         try {
-            // Use provided voice preference, or fall back to user's saved preference
-            const voicePreference = dto?.voicePreference || user.ttsVoicePreference || null;
+            // Use dto override, then affirmation's saved voice, then user default; persist so affirmation remembers
+            const voicePreference = dto?.voicePreference
+                ? (this.textToSpeechService.convertNameToEnum(dto.voicePreference) ?? selectedAffirmation?.ttsVoicePreference ?? user.ttsVoicePreference)
+                : (selectedAffirmation?.ttsVoicePreference ?? user.ttsVoicePreference ?? null);
 
-            // Regenerate audio with selected voice preference
             const aiAffirmationAudioUrl = await this.textToSpeechService.generateAffirmationAudio(
-                session.generatedAffirmation,
+                affirmationText,
                 user.id,
-                voicePreference,
+                voicePreference ?? undefined,
             );
 
-            // Update session with new audio URL
+            if (selectedAffirmation) {
+                await this.prisma.affirmation.update({
+                    where: { id: selectedAffirmation.id },
+                    data: {
+                        audioUrl: aiAffirmationAudioUrl,
+                        ttsVoicePreference: voicePreference ?? undefined,
+                    },
+                });
+            }
+
             const updatedSession = await this.prisma.reflectionSession.update({
                 where: { id: sessionId },
                 data: {
@@ -1094,10 +1142,13 @@ export class ReflectionService extends BaseService {
                             name: true,
                         },
                     },
+                    affirmations: {
+                        orderBy: { createdAt: 'desc' },
+                    },
                 },
             });
 
-            this.logger.log(`Regenerated affirmation audio for session ${sessionId} with voice preference: ${voicePreference || 'default'}${dto?.voicePreference ? ' (override)' : ' (user preference)'}`);
+            this.logger.log(`Regenerated affirmation audio for session ${sessionId} with voice: ${voicePreference ?? 'default'}${dto?.voicePreference ? ' (override)' : ''}`);
 
             return this.Results(updatedSession);
         } catch (error) {
@@ -1177,17 +1228,15 @@ export class ReflectionService extends BaseService {
             );
         }
 
-        // Generate audio if this affirmation doesn't have audio yet
+        // Generate audio if this affirmation doesn't have audio yet; use affirmation's saved voice or user default
         let audioUrl = affirmation.audioUrl;
+        let voiceUsed: typeof user.ttsVoicePreference = affirmation.ttsVoicePreference ?? user.ttsVoicePreference ?? null;
         if (!audioUrl && affirmation.affirmationText) {
             try {
-                // Get user's voice preference
-                const voicePreference = user.ttsVoicePreference || null;
-
                 audioUrl = await this.textToSpeechService.generateAffirmationAudio(
                     affirmation.affirmationText,
                     user.id,
-                    voicePreference,
+                    voiceUsed ?? undefined,
                 );
 
                 this.logger.log(`Generated audio for affirmation ${affirmationId}`);
@@ -1210,12 +1259,13 @@ export class ReflectionService extends BaseService {
                     },
                 });
 
-                // Mark the selected affirmation and update audio URL
+                // Mark the selected affirmation, update audio URL, and persist voice if we just generated (so affirmation remembers)
                 await tx.affirmation.update({
                     where: { id: affirmationId },
                     data: {
                         isSelected: true,
-                        audioUrl: audioUrl, // Update with newly generated audio or existing audio
+                        audioUrl: audioUrl ?? undefined,
+                        ...(voiceUsed != null && !affirmation.ttsVoicePreference && { ttsVoicePreference: voiceUsed }),
                     },
                 });
 
