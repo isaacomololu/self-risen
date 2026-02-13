@@ -6,7 +6,7 @@ export { RecordAffirmationDto } from './record-affirmation.dto';
 export { CreateWaveDto } from './create-wave.dto';
 export { UpdateWaveDto } from './update-wave.dto';
 export { RegenerateVoiceDto } from './regenerate-voice.dto';
-export { VoicePreferenceDto } from './vo./voice-preference.dto
+export { VoicePreferenceDto } from './voice-preference.dto
 export { EditAffirmationDto } from './edit-affirmation.dto';
 export { EditBeliefDto } from './edit-belief.dto';
 export { AffirmationResponseDto } from './affirmation-response.dto';
