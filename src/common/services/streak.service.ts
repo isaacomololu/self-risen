@@ -56,29 +56,6 @@ export class StreakService {
                     lastStreakDate: today,
                 }
             });
-
-            // Check if streak is a milestone and send notification
-            if (this.isStreakMilestone(streak)) {
-                try {
-                    const requestId = `streak-milestone-${user.id}-${Date.now()}-${randomUUID()}`;
-                    await this.notificationService.notifyUser({
-                        userId: user.id,
-                        type: NotificationTypeEnum.STREAK_MILESTONE,
-                        requestId,
-                        channels: [
-                            { type: NotificationChannelTypeEnum.PUSH },
-                            { type: NotificationChannelTypeEnum.IN_APP },
-                        ],
-                        metadata: {
-                            title: `🎉 ${streak} Day Streak!`,
-                            body: `Congratulations! You've maintained a ${streak}-day streak!`,
-                            streak: streak,
-                        },
-                    });
-                } catch (notificationError) {
-                    this.logger.warn(`Failed to send streak milestone notification: ${notificationError.message}`);
-                }
-            }
         } else if (lastStreakDate.getTime() === today.getTime()) {
             // Already logged in today - no update needed
             return;
@@ -206,7 +183,4 @@ export class StreakService {
     /**
      * Check if streak value is a milestone (10, 50, 100, or multiple of 50)
      */
-    private isStreakMilestone(streak: number): boolean {
-        return streak === 10 || streak === 50 || streak === 100 || (streak > 100 && streak % 50 === 0);
-    }
 }

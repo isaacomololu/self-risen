@@ -63,7 +63,7 @@ export class StaterVideosService extends BaseService {
     async getMusicUrls() {
         const musicUrls = [
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/audios/affirmations/user-recorded/51c20a08-c95e-4673-854a-8ed327997681/94b9b87c-bc23-446b-852d-e73da570c5ee-1768564623517.m4a',
+                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/Starters/Over_the_Horizon.m4a',
                 name: 'bright-glow'
             }
         ];

@@ -156,6 +156,10 @@ export class NotificationsController extends BaseController {
     });
   }
 
+  //add delete notification endpoint to delete a notification by id 
+
+
+
   /**
    * @deprecated Use notifyUser() from INotificationService instead
    */

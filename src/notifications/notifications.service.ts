@@ -694,6 +694,10 @@ export class NotificationsService
         { type: NotificationChannelTypeEnum.PUSH },
         { type: NotificationChannelTypeEnum.IN_APP },
       ],
+      [NotificationTypeEnum.STREAK_REMINDER]: [
+        { type: NotificationChannelTypeEnum.PUSH },
+        { type: NotificationChannelTypeEnum.IN_APP },
+      ],
     };
 
     return defaults[type] || [{ type: NotificationChannelTypeEnum.IN_APP }];

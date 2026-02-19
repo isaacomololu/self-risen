@@ -31,10 +31,8 @@ import {
     ChooseFocusDto,
     UpdateFocusDto,
 } from './dto';
-import { StreakInterceptor } from 'src/common';
 
 @UseGuards(FirebaseGuard)
-@UseInterceptors(StreakInterceptor)
 @ApiBearerAuth('firebase')
 @ApiTags('Wheel of Life')
 @Controller('wheel-of-life')

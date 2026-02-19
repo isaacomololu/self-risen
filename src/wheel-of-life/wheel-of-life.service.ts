@@ -76,6 +76,13 @@ export class WheelOfLifeService extends BaseService {
             include: { categories: { orderBy: { order: 'asc' } } },
         });
 
+        const globalBoard = await this.prisma.visionBoard.create({
+            data: {
+                userId: user.id,
+                isGloabal: true,
+            }
+        })
+
         return this.Results(wheel);
     }
 

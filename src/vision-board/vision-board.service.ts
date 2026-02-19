@@ -673,6 +673,7 @@ export class VisionBoardService extends BaseService {
             categoryId: board.categoryId,
             category: board.category,
             visionCount: board._count.visions,
+            isGlobal: board.isGloabal,
             createdAt: board.createdAt,
             updatedAt: board.updatedAt,
         }));
@@ -883,7 +884,6 @@ export class VisionBoardService extends BaseService {
 
         return response;
     }
-
 
     private extractFilePathFromUrl(url: string): string | null {
         try {

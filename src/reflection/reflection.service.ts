@@ -331,28 +331,28 @@ export class ReflectionService extends BaseService {
                 },
             });
 
-            // Send push notification for affirmation generated
-            try {
-                const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
-                await this.notificationService.notifyUser({
-                    userId: user.id,
-                    type: NotificationTypeEnum.AFFIRMATION_GENERATED,
-                    requestId,
-                    channels: [
-                        { type: NotificationChannelTypeEnum.PUSH },
-                        { type: NotificationChannelTypeEnum.IN_APP },
-                    ],
-                    metadata: {
-                        title: 'Affirmation Generated!',
-                        body: `Your affirmation for ${updatedSession.category.name} is ready!`,
-                        sessionId: sessionId,
-                        affirmation: transformation.generatedAffirmation,
-                        categoryName: updatedSession.category.name,
-                    },
-                });
-            } catch (notificationError) {
-                this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
-            }
+            // // Send push notification for affirmation generated
+            // try {
+            //     const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
+            //     await this.notificationService.notifyUser({
+            //         userId: user.id,
+            //         type: NotificationTypeEnum.AFFIRMATION_GENERATED,
+            //         requestId,
+            //         channels: [
+            //             { type: NotificationChannelTypeEnum.PUSH },
+            //             { type: NotificationChannelTypeEnum.IN_APP },
+            //         ],
+            //         metadata: {
+            //             title: 'Affirmation Generated!',
+            //             body: `Your affirmation for ${updatedSession.category.name} is ready!`,
+            //             sessionId: sessionId,
+            //             affirmation: transformation.generatedAffirmation,
+            //             categoryName: updatedSession.category.name,
+            //         },
+            //     });
+            // } catch (notificationError) {
+            //     this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
+            // }
 
             this.logger.log(`Created affirmation ${newAffirmation.id} for session ${sessionId} (order: ${nextOrder}, selected: ${isFirstAffirmation})`);
 
@@ -419,27 +419,27 @@ export class ReflectionService extends BaseService {
                 });
 
                 // Send push notification for affirmation generated
-                try {
-                    const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
-                    await this.notificationService.notifyUser({
-                        userId: user.id,
-                        type: NotificationTypeEnum.AFFIRMATION_GENERATED,
-                        requestId,
-                        channels: [
-                            { type: NotificationChannelTypeEnum.PUSH },
-                            { type: NotificationChannelTypeEnum.IN_APP },
-                        ],
-                        metadata: {
-                            title: 'Affirmation Generated!',
-                            body: `Your affirmation for ${updatedSession.category.name} is ready!`,
-                            sessionId: sessionId,
-                            affirmation: transformation.generatedAffirmation,
-                            categoryName: updatedSession.category.name,
-                        },
-                    });
-                } catch (notificationError) {
-                    this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
-                }
+                // try {
+                //     const requestId = `affirmation-generated-${user.id}-${Date.now()}-${randomUUID()}`;
+                //     await this.notificationService.notifyUser({
+                //         userId: user.id,
+                //         type: NotificationTypeEnum.AFFIRMATION_GENERATED,
+                //         requestId,
+                //         channels: [
+                //             { type: NotificationChannelTypeEnum.PUSH },
+                //             { type: NotificationChannelTypeEnum.IN_APP },
+                //         ],
+                //         metadata: {
+                //             title: 'Affirmation Generated!',
+                //             body: `Your affirmation for ${updatedSession.category.name} is ready!`,
+                //             sessionId: sessionId,
+                //             affirmation: transformation.generatedAffirmation,
+                //             categoryName: updatedSession.category.name,
+                //         },
+                //     });
+                // } catch (notificationError) {
+                //     this.logger.warn(`Failed to send affirmation notification: ${notificationError.message}`);
+                // }
 
                 return this.Results(updatedSession);
             } catch (fallbackError) {
