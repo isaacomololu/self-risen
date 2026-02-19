@@ -5,7 +5,7 @@ import { AuthGuard, FirebaseUser } from 'src/common/';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiBody, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { auth } from 'firebase-admin';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
-import { ChangeNameDto, ChangeUsernameDto, UploadAvatarDto, ChangeTtsVoicePreferenceDto, StreakCalendarQueryDto, StreakChartQueryDto } from './dto';
+import { ChangeNameDto, ChangeUsernameDto, UploadAvatarDto, ChangeTtsVoicePreferenceDto, StreakCalendarQueryDto, StreakChartQueryDto, UpdateStreakReminderPreferencesDto } from './dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StreakService } from 'src/common/services/streak.service';
 import { TokenUsageService } from './token-usage.service';
@@ -354,6 +354,74 @@ export class UserController extends BaseController {
     return this.response({
       message: 'Streak chart retrieved',
       data: chartData,
+    });
+  }
+
+  @Get('streak-reminder-preferences')
+  @ApiOperation({
+    summary: 'Get streak reminder preferences',
+    description: 'Returns the user’s streak reminder settings: enabled, custom times (HH:mm), and timezone. Empty times means defaults (08:00 and 18:00 UTC).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Streak reminder preferences',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Streak reminder preferences retrieved' },
+        data: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean', example: true },
+            times: { type: 'array', items: { type: 'string' }, example: ['08:00', '18:00'] },
+            timezone: { type: 'string', example: 'UTC' },
+          },
+        },
+      },
+    },
+  })
+  async getStreakReminderPreferences(@FirebaseUser() user: auth.DecodedIdToken) {
+    const result = await this.userService.getStreakReminderPreferences(user.uid);
+    if (result.isError) throw result.error;
+    return this.response({
+      message: 'Streak reminder preferences retrieved',
+      data: result.data,
+    });
+  }
+
+  @Patch('streak-reminder-preferences')
+  @ApiOperation({
+    summary: 'Update streak reminder preferences',
+    description: 'Set when to receive streak reminders. Provide times (HH:mm 24h) and timezone; system will send morning/afternoon/evening messages at those times. Empty times = use defaults (08:00 and 18:00 UTC).',
+  })
+  @ApiBody({ type: UpdateStreakReminderPreferencesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Updated streak reminder preferences',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Streak reminder preferences updated' },
+        data: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean' },
+            times: { type: 'array', items: { type: 'string' } },
+            timezone: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  async updateStreakReminderPreferences(
+    @FirebaseUser() user: auth.DecodedIdToken,
+    @Body() body: UpdateStreakReminderPreferencesDto,
+  ) {
+    const result = await this.userService.updateStreakReminderPreferences(user.uid, body);
+    if (result.isError) throw result.error;
+    return this.response({
+      message: 'Streak reminder preferences updated',
+      data: result.data,
     });
   }
 

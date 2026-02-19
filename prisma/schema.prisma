@@ -31,6 +31,9 @@ model User {
   tokensUsedThisMonth Int                 @default(0)
   tokenLimitPerMonth  Int                 @default(30000) // Default limit: 30k tokens per month
   tokenResetDate      DateTime            @default(now())
+  streakReminderEnabled Boolean           @default(true)
+  streakReminderTimes String[]           @default([])
+  timezone            String              @default("UTC")
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   wheelOfLife         WheelOfLife?

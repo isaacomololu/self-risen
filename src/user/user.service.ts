@@ -3,7 +3,7 @@ import { ConflictException, Injectable, NotFoundException, UnauthorizedException
 import { User } from '@prisma/client';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { BaseService, FileType, StorageService } from 'src/common';
-import { ChangeNameDto, ChangeUsernameDto, ChangeTtsVoicePreferenceDto } from './dto';
+import { ChangeNameDto, ChangeUsernameDto, ChangeTtsVoicePreferenceDto, UpdateStreakReminderPreferencesDto } from './dto';
 import { TextToSpeechService } from 'src/reflection/services/text-to-speech.service';
 import { UploadAvatarDto } from './dto/upload-avatar.dto';
 import { config } from 'src/common';
@@ -276,5 +276,57 @@ export class UserService extends BaseService {
     }));
 
     return this.Results({ personas });
+  }
+
+  async getStreakReminderPreferences(firebaseId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId },
+      select: {
+        streakReminderEnabled: true,
+        streakReminderTimes: true,
+        timezone: true,
+      },
+    });
+
+    if (!user) {
+      return this.HandleError(new NotFoundException('User not found'));
+    }
+
+    return this.Results({
+      enabled: user.streakReminderEnabled,
+      times: user.streakReminderTimes ?? [],
+      timezone: user.timezone ?? 'UTC',
+    });
+  }
+
+  async updateStreakReminderPreferences(firebaseId: string, payload: UpdateStreakReminderPreferencesDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId },
+    });
+
+    if (!user) {
+      return this.HandleError(new NotFoundException('User not found'));
+    }
+
+    const data: { streakReminderEnabled?: boolean; streakReminderTimes?: string[]; timezone?: string } = {};
+    if (payload.enabled !== undefined) data.streakReminderEnabled = payload.enabled;
+    if (payload.times !== undefined) data.streakReminderTimes = payload.times;
+    if (payload.timezone !== undefined) data.timezone = payload.timezone;
+
+    const updated = await this.prisma.user.update({
+      where: { firebaseId },
+      data,
+      select: {
+        streakReminderEnabled: true,
+        streakReminderTimes: true,
+        timezone: true,
+      },
+    });
+
+    return this.Results({
+      enabled: updated.streakReminderEnabled,
+      times: updated.streakReminderTimes ?? [],
+      timezone: updated.timezone ?? 'UTC',
+    });
   }
 }
