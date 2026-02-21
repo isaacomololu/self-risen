@@ -303,7 +303,6 @@ export class ReflectionService extends BaseService {
             });
 
             // Update session with transformation results and status
-            // Also update generatedAffirmation and aiAffirmationAudioUrl for backward compatibility
             const updateData: any = {
                 limitingBelief: transformation.limitingBelief,
                 status: 'AFFIRMATION_GENERATED',
@@ -1297,7 +1296,18 @@ export class ReflectionService extends BaseService {
 
             this.logger.log(`Selected affirmation ${affirmationId} for session ${sessionId}`);
 
-            return this.Results(updatedSession);
+            // Expose computed affirmation playback URL (user recording > AI) so clients get one clear field
+            const sessionWithComputed = updatedSession
+                ? {
+                      ...updatedSession,
+                      affirmationAudioUrl:
+                          updatedSession.userAffirmationAudioUrl ??
+                          updatedSession.aiAffirmationAudioUrl ??
+                          null,
+                  }
+                : updatedSession;
+
+            return this.Results(sessionWithComputed);
         } catch (error) {
             this.logger.error(`Error selecting affirmation: ${error.message}`, error.stack);
             return this.HandleError(

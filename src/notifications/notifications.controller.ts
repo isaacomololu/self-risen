@@ -15,6 +15,7 @@ import {
   RemoveFcmTokenDto,
   SendNotificationDto,
   SendBulkNotificationDto,
+  CreateManualNotificationDto,
 } from './dto';
 import { BaseController, FirebaseUser } from 'src/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
@@ -152,6 +153,19 @@ export class NotificationsController extends BaseController {
 
     return this.response({
       message: 'All notifications marked as read',
+      data: result.data,
+    });
+  }
+
+  @Post('manual')
+  @ApiOperation({ summary: 'Manually create and send a notification to a user' })
+  @UseGuards(FirebaseGuard)
+  async createManualNotification(@Body() form: CreateManualNotificationDto) {
+    const result = await this.notificationsService.createManualNotification(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Notification created',
       data: result.data,
     });
   }

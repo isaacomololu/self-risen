@@ -8,6 +8,7 @@ import { DatabaseProvider } from 'src/database/database.provider';
 import {
   RegisterFcmTokenDto,
   RemoveFcmTokenDto,
+  CreateManualNotificationDto,
 } from './dto';
 import {
   INotificationService,
@@ -25,6 +26,7 @@ import {
   NotificationStatusEnum,
   NotificationTypeEnum,
 } from './enums/notification.enum';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class NotificationsService
@@ -235,6 +237,46 @@ export class NotificationsService
       tokens: user.fcmTokens,
       count: user.fcmTokens.length,
     });
+  }
+
+  /**
+   * Manually create and send a notification to a user (in-app and optionally push/email/sms).
+   * Uses the queue and audit logging. Recipient is identified by Firebase UID.
+   */
+  async createManualNotification(payload: CreateManualNotificationDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { firebaseId: payload.recipientFirebaseId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return this.HandleError(
+        new NotFoundException(
+          `User not found for firebaseId: ${payload.recipientFirebaseId}`,
+        ),
+      );
+    }
+
+    const channels = payload.channels?.length
+      ? payload.channels.map((type) => ({ type }))
+      : undefined;
+
+    const requestId = payload.requestId ?? `manual-${randomUUID()}`;
+    const metadata = {
+      title: payload.title,
+      body: payload.body,
+      ...payload.data,
+    };
+
+    const results = await this.notifyUser({
+      userId: user.id,
+      type: NotificationTypeEnum.MANUAL,
+      requestId,
+      channels,
+      metadata,
+    });
+
+    return this.Results({ results });
   }
 
   // New notification methods implementing INotificationService
@@ -696,6 +738,9 @@ export class NotificationsService
       ],
       [NotificationTypeEnum.STREAK_REMINDER]: [
         { type: NotificationChannelTypeEnum.PUSH },
+        { type: NotificationChannelTypeEnum.IN_APP },
+      ],
+      [NotificationTypeEnum.MANUAL]: [
         { type: NotificationChannelTypeEnum.IN_APP },
       ],
     };
