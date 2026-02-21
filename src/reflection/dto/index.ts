@@ -9,5 +9,5 @@ export { RegenerateVoiceDto } from './regenerate-voice.dto';
 export { VoicePreferenceDto } from './voice-preference.dto';
 export { EditAffirmationDto } from './edit-affirmation.dto';
 export { EditBeliefDto } from './edit-belief.dto';
+export { SetBackgroundSoundDto } from './set-background-sound.dto';
 export { AffirmationResponseDto } from './affirmation-response.dto';
-

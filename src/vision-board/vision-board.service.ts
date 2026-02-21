@@ -5,19 +5,31 @@ import { StorageService, FileType } from 'src/common/storage/storage.service';
 import { AddVisionDto } from './dto';
 import { ReflectionSessionStatus, Prisma } from '@prisma/client';
 
+const visionInclude = {
+    reflectionSession: {
+        include: {
+            category: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
+    },
+    backgroundSound: {
+        select: {
+            id: true,
+            soundUrl: true,
+            fileName: true,
+            fileSize: true,
+            mimeType: true,
+            order: true,
+        },
+    },
+} as const;
+
 type VisionWithReflectionSession = Prisma.VisionGetPayload<{
-    include: {
-        reflectionSession: {
-            include: {
-                category: {
-                    select: {
-                        id: true;
-                        name: true;
-                    };
-                };
-            };
-        };
-    };
+    include: typeof visionInclude;
 }>;
 
 type VisionResponse = {
@@ -35,6 +47,15 @@ type VisionResponse = {
             id: string;
             name: string;
         };
+    } | null;
+    backgroundSoundId: string | null;
+    backgroundSound: {
+        id: string;
+        soundUrl: string;
+        fileName: string | null;
+        fileSize: number | null;
+        mimeType: string | null;
+        order: number | null;
     } | null;
 };
 
@@ -88,13 +109,13 @@ export class VisionBoardService extends BaseService {
         let reflectionSession: {
             id: string;
             status: ReflectionSessionStatus;
-            approvedAffirmation: string | null;
-            generatedAffirmation: string | null;
+            selectedAffirmationText: string | null;
             prompt: string;
             category: {
                 id: string;
                 name: string;
             };
+            backgroundSoundId: string | null;
         } | null = null;
         
         if (reflectionSessionId) {
@@ -172,6 +193,11 @@ export class VisionBoardService extends BaseService {
             createData.reflectionSession = {
                 connect: { id: reflectionSessionId },
             };
+            if (reflectionSession?.backgroundSoundId) {
+                createData.backgroundSound = {
+                    connect: { id: reflectionSession.backgroundSoundId },
+                };
+            }
         }
         if (imageUrl) {
             createData.imageUrl = imageUrl;
@@ -179,18 +205,7 @@ export class VisionBoardService extends BaseService {
 
         const visionItem = await this.prisma.vision.create({
             data: createData,
-            include: {
-                reflectionSession: {
-                    include: {
-                        category: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
-            },
+            include: visionInclude,
         });
 
         // Update reflection session to mark it as a vision
@@ -206,8 +221,7 @@ export class VisionBoardService extends BaseService {
             // Use the already fetched data
             visionItem.reflectionSession = {
                 ...visionItem.reflectionSession,
-                approvedAffirmation: reflectionSession.approvedAffirmation,
-                generatedAffirmation: reflectionSession.generatedAffirmation,
+                selectedAffirmationText: reflectionSession.selectedAffirmationText,
                 prompt: reflectionSession.prompt,
                 category: reflectionSession.category,
             } as any;
@@ -249,18 +263,7 @@ export class VisionBoardService extends BaseService {
             orderBy: { order: 'asc' },
             skip,
             take: pageSize,
-            include: {
-                reflectionSession: {
-                    include: {
-                        category: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
-            },
+            include: visionInclude,
         });
 
         const totalPages = Math.ceil(totalCount / pageSize);
@@ -297,18 +300,7 @@ export class VisionBoardService extends BaseService {
                     userId: user.id,
                 },
             },
-            include: {
-                reflectionSession: {
-                    include: {
-                        category: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
-            },
+            include: visionInclude,
         });
 
         if (!visionItem) {
@@ -326,6 +318,7 @@ export class VisionBoardService extends BaseService {
         visionId: string,
         reflectionSessionId?: string,
         imageFile?: Express.Multer.File,
+        backgroundSoundId?: string | null,
     ) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
@@ -333,9 +326,12 @@ export class VisionBoardService extends BaseService {
         }
 
         // Validate that at least one parameter is provided
-        if (!reflectionSessionId && !imageFile) {
+        const hasReflectionSession = reflectionSessionId !== undefined;
+        const hasImage = imageFile !== undefined && imageFile !== null;
+        const hasBackgroundSound = backgroundSoundId !== undefined;
+        if (!hasReflectionSession && !hasImage && !hasBackgroundSound) {
             return this.HandleError(
-                new BadRequestException('Either reflectionSessionId or imageFile must be provided'),
+                new BadRequestException('At least one of reflectionSessionId, imageFile, or backgroundSoundId must be provided'),
             );
         }
 
@@ -346,18 +342,7 @@ export class VisionBoardService extends BaseService {
                     userId: user.id,
                 },
             },
-            include: {
-                reflectionSession: {
-                    include: {
-                        category: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
-            },
+            include: visionInclude,
         });
 
         if (!visionItem) {
@@ -437,23 +422,25 @@ export class VisionBoardService extends BaseService {
                 ? { connect: { id: reflectionSessionId } }
                 : { disconnect: true };
         }
+        if (backgroundSoundId !== undefined) {
+            if (backgroundSoundId != null && backgroundSoundId !== '') {
+                const sound = await this.prisma.visionBoardSound.findUnique({
+                    where: { id: backgroundSoundId },
+                });
+                if (!sound) {
+                    return this.HandleError(new NotFoundException('Sound not found'));
+                }
+                updateData.backgroundSound = { connect: { id: backgroundSoundId } };
+            } else {
+                updateData.backgroundSound = { disconnect: true };
+            }
+        }
 
         // Update vision
         const updatedItem = await this.prisma.vision.update({
             where: { id: visionId },
             data: updateData,
-            include: {
-                reflectionSession: {
-                    include: {
-                        category: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                },
-            },
+            include: visionInclude,
         });
 
         // Update isVision flags for reflection sessions
@@ -871,10 +858,12 @@ export class VisionBoardService extends BaseService {
             updatedAt: vision.updatedAt,
             affirmation: null,
             reflectionSession: null,
+            backgroundSoundId: vision.backgroundSoundId ?? null,
+            backgroundSound: vision.backgroundSound ?? null,
         };
 
         if (vision.reflectionSession) {
-            response.affirmation = vision.reflectionSession.approvedAffirmation || vision.reflectionSession.generatedAffirmation;
+            response.affirmation = vision.reflectionSession.selectedAffirmationText;
             response.reflectionSession = {
                 id: vision.reflectionSession.id,
                 prompt: vision.reflectionSession.prompt,

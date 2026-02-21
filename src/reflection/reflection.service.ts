@@ -83,6 +83,18 @@ export class ReflectionService extends BaseService {
                 id: sessionId,
                 userId: user.id,
             },
+            include: {
+                backgroundSound: {
+                    select: {
+                        id: true,
+                        soundUrl: true,
+                        fileName: true,
+                        fileSize: true,
+                        mimeType: true,
+                        order: true,
+                    },
+                },
+            },
         });
 
         if (!session) {
@@ -90,6 +102,69 @@ export class ReflectionService extends BaseService {
         }
 
         return this.Results(session);
+    }
+
+    /**
+     * Set or clear the background sound for a reflection session.
+     * soundId must be an existing VisionBoardSound id; pass null/undefined to clear.
+     */
+    async setSessionBackgroundSound(
+        firebaseId: string,
+        sessionId: string,
+        soundId: string | null | undefined,
+    ) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
+        });
+
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        if (soundId != null && soundId !== '') {
+            const sound = await this.prisma.visionBoardSound.findUnique({
+                where: { id: soundId },
+            });
+            if (!sound) {
+                return this.HandleError(new NotFoundException('Sound not found'));
+            }
+        }
+
+        const updatedSession = await this.prisma.reflectionSession.update({
+            where: { id: sessionId },
+            data:
+                soundId != null && soundId !== ''
+                    ? { backgroundSound: { connect: { id: soundId } } }
+                    : { backgroundSound: { disconnect: true } },
+            include: {
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                backgroundSound: {
+                    select: {
+                        id: true,
+                        soundUrl: true,
+                        fileName: true,
+                        fileSize: true,
+                        mimeType: true,
+                        order: true,
+                    },
+                },
+            },
+        });
+
+        return this.Results(updatedSession);
     }
 
     async getAllSessions(
@@ -122,6 +197,16 @@ export class ReflectionService extends BaseService {
                     select: {
                         id: true,
                         name: true,
+                    },
+                },
+                backgroundSound: {
+                    select: {
+                        id: true,
+                        soundUrl: true,
+                        fileName: true,
+                        fileSize: true,
+                        mimeType: true,
+                        order: true,
                     },
                 },
             },
@@ -308,10 +393,10 @@ export class ReflectionService extends BaseService {
                 status: 'AFFIRMATION_GENERATED',
             };
 
-            // If this is the first affirmation or it's selected, update the session's legacy fields
+            // If this is the first affirmation, update the session's selected affirmation snapshot
             if (isFirstAffirmation) {
-                updateData.generatedAffirmation = transformation.generatedAffirmation;
-                updateData.aiAffirmationAudioUrl = audioUrl;
+                updateData.selectedAffirmationText = transformation.generatedAffirmation;
+                updateData.selectedAffirmationAudioUrl = audioUrl;
             }
 
             const updatedSession = await this.prisma.reflectionSession.update({
@@ -398,7 +483,7 @@ export class ReflectionService extends BaseService {
                 };
 
                 if (isFirstAffirmation) {
-                    updateData.generatedAffirmation = transformation.generatedAffirmation;
+                    updateData.selectedAffirmationText = transformation.generatedAffirmation;
                 }
 
                 const updatedSession = await this.prisma.reflectionSession.update({
@@ -453,7 +538,7 @@ export class ReflectionService extends BaseService {
 
     /**
      * Edit the affirmation text after AI has generated it.
-     * Allowed when session is in AFFIRMATION_GENERATED or APPROVED status.
+     * Allowed when session is in AFFIRMATION_GENERATED status.
      * Clears AI-generated audio so user can regenerate voice for the new text.
      */
     async editAffirmation(firebaseId: string, sessionId: string, dto: EditAffirmationDto) {
@@ -484,17 +569,17 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        if (session.status !== 'AFFIRMATION_GENERATED' && session.status !== 'APPROVED') {
+        if (session.status !== 'AFFIRMATION_GENERATED') {
             return this.HandleError(
                 new BadRequestException(
-                    `Cannot edit affirmation. Session must have an affirmation (AFFIRMATION_GENERATED or APPROVED). Current status: ${session.status}`,
+                    `Cannot edit affirmation. Session must be in AFFIRMATION_GENERATED status. Current status: ${session.status}`,
                 ),
             );
         }
 
-        if (!session.generatedAffirmation || session.generatedAffirmation.trim().length === 0) {
+        if (!session.selectedAffirmationText || session.selectedAffirmationText.trim().length === 0) {
             return this.HandleError(
-                new BadRequestException('Cannot edit affirmation. No generated affirmation found in session.'),
+                new BadRequestException('Cannot edit affirmation. No selected affirmation found in session.'),
             );
         }
 
@@ -524,8 +609,8 @@ export class ReflectionService extends BaseService {
         const updatedSession = await this.prisma.reflectionSession.update({
             where: { id: sessionId },
             data: {
-                generatedAffirmation: trimmedAffirmation,
-                aiAffirmationAudioUrl: null, // Clear so user can regenerate TTS for new text
+                selectedAffirmationText: trimmedAffirmation,
+                selectedAffirmationAudioUrl: null, // Clear so user can regenerate TTS for new text
             },
             include: {
                 category: {
@@ -545,7 +630,7 @@ export class ReflectionService extends BaseService {
 
     /**
      * Edit the belief text after AI has generated the affirmation.
-     * Allowed when session is in AFFIRMATION_GENERATED or APPROVED status.
+     * Allowed when session is in AFFIRMATION_GENERATED status.
      * Affirmation and audio are unchanged.
      */
     async editBelief(firebaseId: string, sessionId: string, belief: string) {
@@ -573,17 +658,17 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        if (session.status !== 'AFFIRMATION_GENERATED' && session.status !== 'APPROVED') {
+        if (session.status !== 'AFFIRMATION_GENERATED') {
             return this.HandleError(
                 new BadRequestException(
-                    `Cannot edit belief. Session must have an affirmation (AFFIRMATION_GENERATED or APPROVED). Current status: ${session.status}`,
+                    `Cannot edit belief. Session must be in AFFIRMATION_GENERATED status. Current status: ${session.status}`,
                 ),
             );
         }
 
-        if (!session.generatedAffirmation || session.generatedAffirmation.trim().length === 0) {
+        if (!session.selectedAffirmationText || session.selectedAffirmationText.trim().length === 0) {
             return this.HandleError(
-                new BadRequestException('Cannot edit belief. No generated affirmation found in session.'),
+                new BadRequestException('Cannot edit belief. No selected affirmation found in session.'),
             );
         }
 
@@ -681,8 +766,8 @@ export class ReflectionService extends BaseService {
                 transcriptionText,
                 // Clear affirmation data if re-recording
                 limitingBelief: newStatus === 'BELIEF_CAPTURED' ? null : session.limitingBelief,
-                generatedAffirmation: newStatus === 'BELIEF_CAPTURED' ? null : session.generatedAffirmation,
-                aiAffirmationAudioUrl: newStatus === 'BELIEF_CAPTURED' ? null : session.aiAffirmationAudioUrl,
+                selectedAffirmationText: newStatus === 'BELIEF_CAPTURED' ? null : session.selectedAffirmationText,
+                selectedAffirmationAudioUrl: newStatus === 'BELIEF_CAPTURED' ? null : session.selectedAffirmationAudioUrl,
                 userAffirmationAudioUrl: newStatus === 'BELIEF_CAPTURED' ? null : session.userAffirmationAudioUrl,
                 status: newStatus,
                 beliefRerecordCount: session.beliefRerecordCount + 1,
@@ -726,10 +811,10 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        if (session.status !== 'AFFIRMATION_GENERATED' && session.status !== 'APPROVED') {
+        if (session.status !== 'AFFIRMATION_GENERATED') {
             return this.HandleError(
                 new BadRequestException(
-                    `Cannot record affirmation. Session must be in AFFIRMATION_GENERATED or APPROVED status. Current status: ${session.status}`,
+                    `Cannot record affirmation. Session must be in AFFIRMATION_GENERATED status. Current status: ${session.status}`,
                 ),
             );
         }
@@ -845,10 +930,10 @@ export class ReflectionService extends BaseService {
             );
         }
 
-        if (!session.approvedAffirmation && !session.generatedAffirmation) {
+        if (!session.selectedAffirmationText) {
             return this.HandleError(
                 new BadRequestException(
-                    'Cannot create a wave. Session must have an approved or generated affirmation.',
+                    'Cannot create a wave. Session must have a selected affirmation.',
                 ),
             );
         }
@@ -1089,20 +1174,19 @@ export class ReflectionService extends BaseService {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        // Only regenerate if affirmation exists (session legacy or selected affirmation)
+        // Only regenerate if affirmation exists (selected affirmation or session snapshot)
         const selectedAffirmation = session.affirmations[0];
-        const affirmationText = selectedAffirmation?.affirmationText ?? session.generatedAffirmation;
+        const affirmationText = selectedAffirmation?.affirmationText ?? session.selectedAffirmationText;
         if (!affirmationText || affirmationText.trim().length === 0) {
             return this.HandleError(
-                new BadRequestException('Cannot regenerate voice. No generated affirmation found in session.'),
+                new BadRequestException('Cannot regenerate voice. No selected affirmation found in session.'),
             );
         }
 
-        // Check if session has affirmation generated or approved
-        if (session.status !== 'AFFIRMATION_GENERATED' && session.status !== 'APPROVED') {
+        if (session.status !== 'AFFIRMATION_GENERATED') {
             return this.HandleError(
                 new BadRequestException(
-                    `Cannot regenerate voice. Session must be in AFFIRMATION_GENERATED or APPROVED status. Current status: ${session.status}`,
+                    `Cannot regenerate voice. Session must be in AFFIRMATION_GENERATED status. Current status: ${session.status}`,
                 ),
             );
         }
@@ -1113,7 +1197,7 @@ export class ReflectionService extends BaseService {
                 ? (this.textToSpeechService.convertNameToEnum(dto.voicePreference) ?? selectedAffirmation?.ttsVoicePreference ?? user.ttsVoicePreference)
                 : (selectedAffirmation?.ttsVoicePreference ?? user.ttsVoicePreference ?? null);
 
-            const aiAffirmationAudioUrl = await this.textToSpeechService.generateAffirmationAudio(
+            const selectedAffirmationAudioUrl = await this.textToSpeechService.generateAffirmationAudio(
                 affirmationText,
                 user.id,
                 voicePreference ?? undefined,
@@ -1123,7 +1207,7 @@ export class ReflectionService extends BaseService {
                 await this.prisma.affirmation.update({
                     where: { id: selectedAffirmation.id },
                     data: {
-                        audioUrl: aiAffirmationAudioUrl,
+                        audioUrl: selectedAffirmationAudioUrl,
                         ttsVoicePreference: voicePreference ?? undefined,
                     },
                 });
@@ -1132,7 +1216,7 @@ export class ReflectionService extends BaseService {
             const updatedSession = await this.prisma.reflectionSession.update({
                 where: { id: sessionId },
                 data: {
-                    aiAffirmationAudioUrl,
+                    selectedAffirmationAudioUrl,
                 },
                 include: {
                     category: {
@@ -1268,12 +1352,12 @@ export class ReflectionService extends BaseService {
                     },
                 });
 
-                // Update session's legacy fields for backward compatibility
+                // Update session's selected affirmation snapshot
                 await tx.reflectionSession.update({
                     where: { id: sessionId },
                     data: {
-                        generatedAffirmation: affirmation.affirmationText,
-                        aiAffirmationAudioUrl: audioUrl,
+                        selectedAffirmationText: affirmation.affirmationText,
+                        selectedAffirmationAudioUrl: audioUrl,
                     },
                 });
             });
@@ -1302,7 +1386,7 @@ export class ReflectionService extends BaseService {
                       ...updatedSession,
                       affirmationAudioUrl:
                           updatedSession.userAffirmationAudioUrl ??
-                          updatedSession.aiAffirmationAudioUrl ??
+                          updatedSession.selectedAffirmationAudioUrl ??
                           null,
                   }
                 : updatedSession;

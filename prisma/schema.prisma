@@ -224,11 +224,10 @@ model ReflectionSession {
   rawBeliefText           String?
   audioUrl                String?
   transcriptionText       String?
-  limitingBelief          String?
-  generatedAffirmation    String?
-  approvedAffirmation     String?
-  aiAffirmationAudioUrl   String?
-  userAffirmationAudioUrl String?
+  limitingBelief               String?
+  selectedAffirmationText     String?
+  selectedAffirmationAudioUrl  String?
+  userAffirmationAudioUrl      String?
   playbackCount           Int                     @default(0)
   lastPlayedAt            DateTime?
   beliefRerecordedAt      DateTime?
@@ -241,6 +240,8 @@ model ReflectionSession {
   vision                  Vision?
   waves                   Wave[]
   affirmations            Affirmation[]
+  backgroundSoundId      String?
+  backgroundSound        VisionBoardSound? @relation(fields: [backgroundSoundId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([categoryId])
@@ -304,6 +305,8 @@ model Vision {
   reflectionSession   ReflectionSession? @relation(fields: [reflectionSessionId], references: [id], onDelete: Cascade)
   imageUrl            String?
   order               Int?
+  backgroundSoundId   String?
+  backgroundSound     VisionBoardSound?  @relation(fields: [backgroundSoundId], references: [id], onDelete: SetNull)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -329,14 +332,16 @@ model Journal {
 }
 
 model VisionBoardSound {
-  id        String   @id @default(uuid())
-  soundUrl  String
-  fileName  String?
-  fileSize  Int?
-  mimeType  String?
-  order     Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String              @id @default(uuid())
+  soundUrl           String
+  fileName           String?
+  fileSize           Int?
+  mimeType           String?
+  order              Int?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  reflectionSessions ReflectionSession[]
+  visions            Vision[]
 }
 
 enum NotificationChannelType {
@@ -356,7 +361,6 @@ enum ReflectionSessionStatus {
   PENDING
   BELIEF_CAPTURED
   AFFIRMATION_GENERATED
-  APPROVED
   COMPLETED
 }
 

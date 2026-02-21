@@ -29,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { ReflectionService } from './reflection.service';
-import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, VoicePreferenceDto, EditAffirmationDto, EditBeliefDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, VoicePreferenceDto, EditAffirmationDto, EditBeliefDto, SetBackgroundSoundDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -217,7 +217,7 @@ export class ReflectionController extends BaseController {
     @Patch('sessions/:sessionId/affirmation')
     @ApiOperation({
         summary: 'Edit affirmation',
-        description: 'Allows the user to edit the AI-generated affirmation text after it has been generated. Session must be in AFFIRMATION_GENERATED or APPROVED status. AI-generated audio is cleared so the user can regenerate voice for the new text.',
+        description: 'Allows the user to edit the AI-generated affirmation text after it has been generated. Session must be in AFFIRMATION_GENERATED status. AI-generated audio is cleared so the user can regenerate voice for the new text.',
     })
     @ApiParam({
         name: 'sessionId',
@@ -259,7 +259,7 @@ export class ReflectionController extends BaseController {
     @Patch('sessions/:sessionId/belief')
     @ApiOperation({
         summary: 'Edit belief',
-        description: 'Allows the user to edit the belief text after the AI has generated the affirmation. Session must be in AFFIRMATION_GENERATED or APPROVED status. Affirmation and audio are unchanged.',
+        description: 'Allows the user to edit the belief text after the AI has generated the affirmation. Session must be in AFFIRMATION_GENERATED status. Affirmation and audio are unchanged.',
     })
     @ApiParam({
         name: 'sessionId',
@@ -294,6 +294,44 @@ export class ReflectionController extends BaseController {
 
         return this.response({
             message: 'Belief updated successfully',
+            data: result.data,
+        });
+    }
+
+    @Patch('sessions/:sessionId/background-sound')
+    @ApiOperation({
+        summary: 'Set or clear background sound',
+        description: 'Sets the background sound for this reflection session from the vision board sound catalog. Send soundId: null to clear.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiBody({ type: SetBackgroundSoundDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Background sound updated successfully',
+        type: ReflectionSessionResponseDto,
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Reflection session or sound not found',
+    })
+    async setSessionBackgroundSound(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+        @Body() dto: SetBackgroundSoundDto,
+    ) {
+        const result = await this.reflectionService.setSessionBackgroundSound(
+            user.uid,
+            sessionId,
+            dto.soundId ?? null,
+        );
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Background sound updated successfully',
             data: result.data,
         });
     }
@@ -458,7 +496,7 @@ export class ReflectionController extends BaseController {
     @Post('sessions/:sessionId/regenerate-voice')
     @ApiOperation({
         summary: 'Regenerate AI affirmation voice',
-        description: 'Regenerates the AI-generated affirmation audio. Optionally accepts a voice preference (MALE, FEMALE, ANDROGYNOUS). If not provided, uses the user\'s saved preference. Session must have a generated affirmation and be in AFFIRMATION_GENERATED or APPROVED status.',
+        description: 'Regenerates the AI-generated affirmation audio. Optionally accepts a voice preference (MALE, FEMALE, ANDROGYNOUS). If not provided, uses the user\'s saved preference. Session must have a selected affirmation and be in AFFIRMATION_GENERATED status.',
     })
     @ApiParam({
         name: 'sessionId',
@@ -510,7 +548,7 @@ export class ReflectionController extends BaseController {
     @Post('waves')
     @ApiOperation({
         summary: 'Create a wave for an existing session',
-        description: 'Creates a new wave (listening period) for an existing reflection session. Blocks creation if session already has an active wave. Session must have an approved or generated affirmation.',
+        description: 'Creates a new wave (listening period) for an existing reflection session. Blocks creation if session already has an active wave. Session must have a selected affirmation.',
     })
     @ApiBody({ type: CreateWaveDto })
     @ApiResponse({

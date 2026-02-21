@@ -1,6 +1,26 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AffirmationResponseDto } from './affirmation-response.dto';
 
+export class BackgroundSoundResponseDto {
+    @ApiProperty()
+    id: string;
+
+    @ApiProperty()
+    soundUrl: string;
+
+    @ApiProperty({ required: false, nullable: true })
+    fileName?: string | null;
+
+    @ApiProperty({ required: false, nullable: true })
+    fileSize?: number | null;
+
+    @ApiProperty({ required: false, nullable: true })
+    mimeType?: string | null;
+
+    @ApiProperty({ required: false, nullable: true })
+    order?: number | null;
+}
+
 export class ReflectionSessionResponseDto {
     @ApiProperty()
     id: string;
@@ -29,13 +49,10 @@ export class ReflectionSessionResponseDto {
     @ApiProperty({ required: false })
     limitingBelief?: string;
 
-    @ApiProperty({ required: false })
-    generatedAffirmation?: string;
+    @ApiProperty({ required: false, description: 'Text of the currently selected affirmation (snapshot on session)' })
+    selectedAffirmationText?: string;
 
-    @ApiProperty({ required: false })
-    approvedAffirmation?: string;
-
-    @ApiProperty({ enum: ['PENDING', 'BELIEF_CAPTURED', 'AFFIRMATION_GENERATED', 'APPROVED', 'COMPLETED'] })
+    @ApiProperty({ enum: ['PENDING', 'BELIEF_CAPTURED', 'AFFIRMATION_GENERATED', 'COMPLETED'] })
     status: string;
 
     @ApiProperty()
@@ -59,8 +76,8 @@ export class ReflectionSessionResponseDto {
         updatedAt: Date;
     }>;
 
-    @ApiProperty({ required: false })
-    aiAffirmationAudioUrl?: string;
+    @ApiProperty({ required: false, description: 'AI TTS URL for the currently selected affirmation' })
+    selectedAffirmationAudioUrl?: string;
 
     @ApiProperty({ required: false })
     userAffirmationAudioUrl?: string;
@@ -92,5 +109,15 @@ export class ReflectionSessionResponseDto {
         description: 'List of all affirmations generated for this session' 
     })
     affirmations?: AffirmationResponseDto[];
+
+    @ApiProperty({ required: false, description: 'ID of the selected background sound (from vision board catalog)' })
+    backgroundSoundId?: string;
+
+    @ApiProperty({
+        required: false,
+        description: 'Background sound details when set',
+        type: () => BackgroundSoundResponseDto,
+    })
+    backgroundSound?: BackgroundSoundResponseDto;
 }
 

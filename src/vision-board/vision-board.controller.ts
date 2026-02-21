@@ -46,7 +46,7 @@ export class VisionBoardController extends BaseController {
     @ApiConsumes('multipart/form-data')
     @ApiOperation({
         summary: 'Add a vision to vision board',
-        description: 'Adds a vision to the vision board. Can include a reflection session (must be in APPROVED status) and/or an image. Both are optional.',
+        description: 'Adds a vision to the vision board. Can include a reflection session (must be in AFFIRMATION_GENERATED status) and/or an image. Both are optional.',
     })
     @ApiBody({
         schema: {
@@ -77,7 +77,7 @@ export class VisionBoardController extends BaseController {
     })
     @ApiResponse({
         status: 400,
-        description: 'Invalid request or reflection session not in APPROVED status (if provided)',
+        description: 'Invalid request or reflection session not in AFFIRMATION_GENERATED status (if provided)',
     })
     @ApiResponse({
         status: 404,
@@ -211,6 +211,12 @@ export class VisionBoardController extends BaseController {
                     description: 'The ID of the reflection session to link to the vision (optional)',
                     example: 'reflection-session-id-123',
                 },
+                backgroundSoundId: {
+                    type: 'string',
+                    nullable: true,
+                    description: 'ID of the background sound from the vision board sound catalog. Pass null to clear (optional)',
+                    example: 'sound-id-123',
+                },
                 image: {
                     type: 'string',
                     format: 'binary',
@@ -243,6 +249,7 @@ export class VisionBoardController extends BaseController {
             visionId,
             dto.reflectionSessionId,
             imageFile,
+            dto.backgroundSoundId,
         );
         if (result.isError) throw result.error;
 

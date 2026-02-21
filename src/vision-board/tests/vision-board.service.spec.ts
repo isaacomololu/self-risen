@@ -50,9 +50,9 @@ describe('VisionBoardService', () => {
     categoryId: 'cat-1',
     prompt: 'My body is...',
     status: ReflectionSessionStatus.AFFIRMATION_GENERATED,
-    generatedAffirmation: 'I am healthy and vibrant',
-    approvedAffirmation: null,
+    selectedAffirmationText: 'I am healthy and vibrant',
     category: { id: 'cat-1', name: 'Health & Well-being' },
+    backgroundSoundId: null as string | null,
   };
 
   const mockVision = {
@@ -61,6 +61,8 @@ describe('VisionBoardService', () => {
     reflectionSessionId: 'session-123',
     imageUrl: 'https://storage.com/image.jpg',
     order: 1,
+    backgroundSoundId: null as string | null,
+    backgroundSound: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     reflectionSession: mockReflectionSession,
@@ -139,6 +141,31 @@ describe('VisionBoardService', () => {
       expect(result.isError).toBe(false);
       expect(result.data?.id).toBe('vision-123');
       expect(mockPrisma.vision.create).toHaveBeenCalled();
+      const createData = mockPrisma.vision.create.mock.calls[0][0].data;
+      expect(createData.backgroundSound).toBeUndefined();
+    });
+
+    it('should copy session background sound to vision when session has backgroundSoundId', async () => {
+      const sessionWithSound = {
+        ...mockReflectionSession,
+        backgroundSoundId: 'sound-123',
+      };
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockPrisma.visionBoard.findFirst.mockResolvedValue(mockVisionBoard);
+      mockPrisma.reflectionSession.findFirst.mockResolvedValue(sessionWithSound);
+      mockPrisma.vision.findUnique.mockResolvedValue(null);
+      mockPrisma.vision.findFirst.mockResolvedValue(null);
+      mockPrisma.vision.create.mockResolvedValue({
+        ...mockVision,
+        backgroundSoundId: 'sound-123',
+        backgroundSound: mockVisionBoardSound,
+      });
+
+      const result = await service.addVision('firebase-uid-123', 'vision-board-123', 'session-123');
+
+      expect(result.isError).toBe(false);
+      const createData = mockPrisma.vision.create.mock.calls[0][0].data;
+      expect(createData.backgroundSound).toEqual({ connect: { id: 'sound-123' } });
     });
 
     it('should successfully add a vision with image file', async () => {
@@ -385,13 +412,45 @@ describe('VisionBoardService', () => {
       expect(result.error).toBeInstanceOf(NotFoundException);
     });
 
-    it('should return error when neither reflectionSessionId nor imageFile is provided', async () => {
+    it('should return error when no update parameters are provided', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
 
       const result = await service.updateVision('firebase-uid-123', 'vision-123');
 
       expect(result.isError).toBe(true);
       expect(result.error).toBeInstanceOf(BadRequestException);
+    });
+
+    it('should successfully update vision background sound', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockPrisma.vision.findFirst.mockResolvedValue(mockVision);
+      mockPrisma.visionBoardSound.findUnique.mockResolvedValue(mockVisionBoardSound);
+      mockPrisma.vision.update.mockResolvedValue({
+        ...mockVision,
+        backgroundSoundId: 'sound-123',
+        backgroundSound: mockVisionBoardSound,
+      });
+
+      const result = await service.updateVision(
+        'firebase-uid-123',
+        'vision-123',
+        undefined,
+        undefined,
+        'sound-123',
+      );
+
+      expect(result.isError).toBe(false);
+      expect(mockPrisma.visionBoardSound.findUnique).toHaveBeenCalledWith({
+        where: { id: 'sound-123' },
+      });
+      expect(mockPrisma.vision.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'vision-123' },
+          data: expect.objectContaining({
+            backgroundSound: { connect: { id: 'sound-123' } },
+          }),
+        }),
+      );
     });
 
     it('should return error when vision not found', async () => {
