@@ -230,6 +230,58 @@ export class VisionBoardService extends BaseService {
         return this.Results(this.mapVisionToResponse(visionItem));
     }
 
+    async addVisionToGlobalBoard(
+        firebaseId: string,
+        visionId: string,
+    ) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+        
+        // Verify vision board exists and belongs to user
+        const visionBoard = await this.prisma.visionBoard.findFirst({
+            where: {
+                userId: user.id,
+                isGloabal: true,
+            },
+        });
+        if (!visionBoard) {
+            return this.HandleError(new NotFoundException('Vision board not found'));
+        }
+        
+        const maxOrderItem = await this.prisma.vision.findFirst({
+            where: { visionBoardId: visionBoard.id },
+            orderBy: { order: 'desc' },
+        });
+    
+        const order = maxOrderItem ? (maxOrderItem.order || 0) + 1 : 1;
+
+        const sourceVision = await this.prisma.vision.findFirst({
+            where: {
+                id: visionId,
+                visionBoard: { userId: user.id },
+            },
+        });
+        if (!sourceVision) {
+            return this.HandleError(new NotFoundException('Vision not found'));
+        }
+
+        const visionItem = await this.prisma.vision.create({
+            data: {
+                visionBoard: { connect: { id: visionBoard.id } },
+                order,
+                ...(sourceVision.imageUrl && { imageUrl: sourceVision.imageUrl }),
+                ...(sourceVision.backgroundSoundId && {
+                    backgroundSound: { connect: { id: sourceVision.backgroundSoundId } },
+                }),
+            },
+            include: visionInclude,
+        });
+
+        return this.Results(this.mapVisionToResponse(visionItem));
+    }
+
     /**
      * Get all visions for user's vision board (paginated)
      */

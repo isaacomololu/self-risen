@@ -29,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { VisionBoardService } from './vision-board.service';
-import { AddVisionDto, UpdateVisionDto, ReorderVisionDto, ReorderSoundDto } from './dto';
+import { AddVisionDto, AddVisionToGlobalBoardDto, UpdateVisionDto, ReorderVisionDto, ReorderSoundDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -98,6 +98,33 @@ export class VisionBoardController extends BaseController {
 
         return this.response({
             message: 'Vision added successfully',
+            data: result.data,
+        });
+    }
+
+    @Post('visions/global')
+    @ApiOperation({
+        summary: 'Duplicate a vision onto the global vision board',
+        description: 'Creates a copy of an existing vision (same image and background sound) on the user\'s global vision board. The source vision must belong to the user. Reflection session is not copied (one session can only link to one vision).',
+    })
+    @ApiBody({ type: AddVisionToGlobalBoardDto })
+    @ApiResponse({
+        status: 201,
+        description: 'Vision duplicated to global board successfully',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User, vision board, or source vision not found',
+    })
+    async addVisionToGlobalBoard(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Body() dto: AddVisionToGlobalBoardDto,
+    ) {
+        const result = await this.visionBoardService.addVisionToGlobalBoard(user.uid, dto.visionId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Vision added to global board successfully',
             data: result.data,
         });
     }
