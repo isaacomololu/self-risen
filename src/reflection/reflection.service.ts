@@ -84,14 +84,13 @@ export class ReflectionService extends BaseService {
                 userId: user.id,
             },
             include: {
-                backgroundSound: {
+                reflectionSound: {
                     select: {
                         id: true,
                         soundUrl: true,
-                        fileName: true,
+                        name: true,
                         fileSize: true,
                         mimeType: true,
-                        order: true,
                     },
                 },
             },
@@ -105,13 +104,12 @@ export class ReflectionService extends BaseService {
     }
 
     /**
-     * Set or clear the background sound for a reflection session.
-     * soundId must be an existing VisionBoardSound id; pass null/undefined to clear.
+     * Create or replace the sound for a reflection session (1:1). Uploads the file and creates/updates ReflectionSound.
      */
-    async setSessionBackgroundSound(
+    async createReflectionSound(
         firebaseId: string,
         sessionId: string,
-        soundId: string | null | undefined,
+        audioFile: Express.Multer.File,
     ) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
@@ -123,48 +121,87 @@ export class ReflectionService extends BaseService {
                 id: sessionId,
                 userId: user.id,
             },
+            include: { reflectionSound: true },
         });
 
         if (!session) {
             return this.HandleError(new NotFoundException('Reflection session not found'));
         }
 
-        if (soundId != null && soundId !== '') {
-            const sound = await this.prisma.visionBoardSound.findUnique({
-                where: { id: soundId },
-            });
-            if (!sound) {
-                return this.HandleError(new NotFoundException('Sound not found'));
+        try {
+            const uploadResult = await this.storageService.uploadFile(
+                audioFile,
+                FileType.AUDIO,
+                user.id,
+                'reflection/sounds',
+            );
+
+            const soundData = {
+                soundUrl: uploadResult.url,
+                name: audioFile.originalname || null,
+                fileSize: audioFile.size || null,
+                mimeType: audioFile.mimetype || null,
+            };
+
+            let reflectionSound;
+            if (session.reflectionSound) {
+                reflectionSound = await this.prisma.reflectionSound.update({
+                    where: { id: session.reflectionSound.id },
+                    data: soundData,
+                });
+            } else {
+                reflectionSound = await this.prisma.reflectionSound.create({
+                    data: {
+                        reflectionSessionId: sessionId,
+                        ...soundData,
+                    },
+                });
             }
+
+            return this.Results(reflectionSound);
+        } catch (error) {
+            return this.HandleError(
+                new BadRequestException(`Failed to upload sound: ${error.message}`),
+            );
+        }
+    }
+
+    /**
+     * Get the sound for a reflection session (1:1, so returns single sound or null).
+     */
+    async getSoundForReflection(firebaseId: string, sessionId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
         }
 
-        const updatedSession = await this.prisma.reflectionSession.update({
-            where: { id: sessionId },
-            data:
-                soundId != null && soundId !== ''
-                    ? { backgroundSound: { connect: { id: soundId } } }
-                    : { backgroundSound: { disconnect: true } },
+        const session = await this.prisma.reflectionSession.findFirst({
+            where: {
+                id: sessionId,
+                userId: user.id,
+            },
             include: {
-                category: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
-                backgroundSound: {
+                reflectionSound: {
                     select: {
                         id: true,
                         soundUrl: true,
-                        fileName: true,
+                        name: true,
                         fileSize: true,
                         mimeType: true,
-                        order: true,
+                        createdAt: true,
+                        updatedAt: true,
                     },
                 },
             },
         });
 
-        return this.Results(updatedSession);
+        if (!session) {
+            return this.HandleError(new NotFoundException('Reflection session not found'));
+        }
+
+        return this.Results({
+            sound: session.reflectionSound ?? null,
+        });
     }
 
     async getAllSessions(
@@ -199,14 +236,13 @@ export class ReflectionService extends BaseService {
                         name: true,
                     },
                 },
-                backgroundSound: {
+                reflectionSound: {
                     select: {
                         id: true,
                         soundUrl: true,
-                        fileName: true,
+                        name: true,
                         fileSize: true,
                         mimeType: true,
-                        order: true,
                     },
                 },
             },

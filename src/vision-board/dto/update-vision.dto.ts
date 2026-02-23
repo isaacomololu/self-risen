@@ -12,13 +12,13 @@ export class UpdateVisionDto {
     reflectionSessionId?: string;
 
     @ApiProperty({
-        description: 'ID of the background sound from the vision board sound catalog. Pass null to clear (optional)',
+        description: 'ID of the vision sound from the catalog. Pass null to clear (optional)',
         example: 'sound-id-123',
         nullable: true,
         required: false,
     })
     @IsString()
     @IsOptional()
-    backgroundSoundId?: string | null;
+    visionSoundId?: string | null;
 }
 

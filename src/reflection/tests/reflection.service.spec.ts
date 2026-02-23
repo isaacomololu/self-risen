@@ -88,8 +88,10 @@ describe('ReflectionService', () => {
         update: jest.fn(),
         count: jest.fn(),
       },
-      visionBoardSound: {
-        findUnique: jest.fn(),
+      reflectionSound: {
+        create: jest.fn(),
+        update: jest.fn(),
+        findFirst: jest.fn(),
       },
       wave: {
         create: jest.fn(),
@@ -189,101 +191,99 @@ describe('ReflectionService', () => {
     });
   });
 
-  describe('setSessionBackgroundSound', () => {
-    const mockSound = {
-      id: 'sound-123',
+  describe('createReflectionSound', () => {
+    const mockReflectionSound = {
+      id: 'ref-sound-123',
+      reflectionSessionId: 'session-123',
       soundUrl: 'https://storage.com/sound.mp3',
-      fileName: 'ambient.mp3',
+      name: 'ambient.mp3',
       fileSize: 1024,
       mimeType: 'audio/mpeg',
-      order: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
-    it('should set background sound when soundId is provided', async () => {
+    it('should create reflection sound when session has none', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.reflectionSession.findFirst.mockResolvedValue(mockSession);
-      mockPrisma.visionBoardSound.findUnique.mockResolvedValue(mockSound);
-      mockPrisma.reflectionSession.update.mockResolvedValue({
-        ...mockSession,
-        backgroundSoundId: 'sound-123',
-        backgroundSound: mockSound,
-        category: mockSession.category,
-      });
+      mockPrisma.reflectionSession.findFirst.mockResolvedValue({ ...mockSession, reflectionSound: null });
+      mockStorageService.uploadFile.mockResolvedValue({ url: 'https://storage.com/sound.mp3' });
+      mockPrisma.reflectionSound.create.mockResolvedValue(mockReflectionSound);
 
-      const result = await service.setSessionBackgroundSound(
-        'firebase-uid-123',
-        'session-123',
-        'sound-123',
-      );
+      const mockFile = { originalname: 'ambient.mp3', size: 1024, mimetype: 'audio/mpeg' } as Express.Multer.File;
+      const result = await service.createReflectionSound('firebase-uid-123', 'session-123', mockFile);
 
       expect(result.isError).toBe(false);
-      expect(mockPrisma.visionBoardSound.findUnique).toHaveBeenCalledWith({
-        where: { id: 'sound-123' },
-      });
-      expect(mockPrisma.reflectionSession.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'session-123' },
-          data: { backgroundSound: { connect: { id: 'sound-123' } } },
+      expect(mockPrisma.reflectionSound.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          reflectionSessionId: 'session-123',
+          soundUrl: 'https://storage.com/sound.mp3',
+          name: 'ambient.mp3',
         }),
-      );
+      });
     });
 
-    it('should clear background sound when soundId is null', async () => {
+    it('should replace reflection sound when session already has one', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.reflectionSession.findFirst.mockResolvedValue({
         ...mockSession,
-        backgroundSoundId: 'sound-123',
+        reflectionSound: mockReflectionSound,
       });
-      mockPrisma.reflectionSession.update.mockResolvedValue({
-        ...mockSession,
-        backgroundSoundId: null,
-        backgroundSound: null,
-        category: mockSession.category,
+      mockStorageService.uploadFile.mockResolvedValue({ url: 'https://storage.com/new-sound.mp3' });
+      mockPrisma.reflectionSound.update.mockResolvedValue({
+        ...mockReflectionSound,
+        soundUrl: 'https://storage.com/new-sound.mp3',
       });
 
-      const result = await service.setSessionBackgroundSound(
-        'firebase-uid-123',
-        'session-123',
-        null,
-      );
+      const mockFile = { originalname: 'new.mp3', size: 2048, mimetype: 'audio/mpeg' } as Express.Multer.File;
+      const result = await service.createReflectionSound('firebase-uid-123', 'session-123', mockFile);
 
       expect(result.isError).toBe(false);
-      expect(mockPrisma.visionBoardSound.findUnique).not.toHaveBeenCalled();
-      expect(mockPrisma.reflectionSession.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'session-123' },
-          data: { backgroundSound: { disconnect: true } },
-        }),
-      );
+      expect(mockPrisma.reflectionSound.update).toHaveBeenCalled();
     });
 
     it('should return error when session not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.reflectionSession.findFirst.mockResolvedValue(null);
 
-      const result = await service.setSessionBackgroundSound(
-        'firebase-uid-123',
-        'nonexistent-session',
-        'sound-123',
-      );
+      const mockFile = { originalname: 'a.mp3' } as Express.Multer.File;
+      const result = await service.createReflectionSound('firebase-uid-123', 'nonexistent-session', mockFile);
 
       expect(result.isError).toBe(true);
       expect(result.error).toBeInstanceOf(NotFoundException);
     });
+  });
 
-    it('should return error when sound not found', async () => {
+  describe('getSoundForReflection', () => {
+    it('should return sound when session has one', async () => {
+      const mockReflectionSound = {
+        id: 'ref-sound-123',
+        soundUrl: 'https://storage.com/sound.mp3',
+        name: 'ambient.mp3',
+        fileSize: 1024,
+        mimeType: 'audio/mpeg',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.reflectionSession.findFirst.mockResolvedValue(mockSession);
-      mockPrisma.visionBoardSound.findUnique.mockResolvedValue(null);
+      mockPrisma.reflectionSession.findFirst.mockResolvedValue({
+        ...mockSession,
+        reflectionSound: mockReflectionSound,
+      });
 
-      const result = await service.setSessionBackgroundSound(
-        'firebase-uid-123',
-        'session-123',
-        'nonexistent-sound',
-      );
+      const result = await service.getSoundForReflection('firebase-uid-123', 'session-123');
 
-      expect(result.isError).toBe(true);
-      expect(result.error).toBeInstanceOf(NotFoundException);
+      expect(result.isError).toBe(false);
+      expect(result.data?.sound).toEqual(mockReflectionSound);
+    });
+
+    it('should return null sound when session has none', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockPrisma.reflectionSession.findFirst.mockResolvedValue({ ...mockSession, reflectionSound: null });
+
+      const result = await service.getSoundForReflection('firebase-uid-123', 'session-123');
+
+      expect(result.isError).toBe(false);
+      expect(result.data?.sound).toBeNull();
     });
   });
 

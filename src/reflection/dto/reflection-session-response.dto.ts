@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AffirmationResponseDto } from './affirmation-response.dto';
 
-export class BackgroundSoundResponseDto {
+export class ReflectionSoundResponseDto {
     @ApiProperty()
     id: string;
 
@@ -9,16 +9,13 @@ export class BackgroundSoundResponseDto {
     soundUrl: string;
 
     @ApiProperty({ required: false, nullable: true })
-    fileName?: string | null;
+    name?: string | null;
 
     @ApiProperty({ required: false, nullable: true })
     fileSize?: number | null;
 
     @ApiProperty({ required: false, nullable: true })
     mimeType?: string | null;
-
-    @ApiProperty({ required: false, nullable: true })
-    order?: number | null;
 }
 
 export class ReflectionSessionResponseDto {
@@ -110,14 +107,11 @@ export class ReflectionSessionResponseDto {
     })
     affirmations?: AffirmationResponseDto[];
 
-    @ApiProperty({ required: false, description: 'ID of the selected background sound (from vision board catalog)' })
-    backgroundSoundId?: string;
-
     @ApiProperty({
         required: false,
-        description: 'Background sound details when set',
-        type: () => BackgroundSoundResponseDto,
+        description: 'Reflection session sound (1:1)',
+        type: () => ReflectionSoundResponseDto,
     })
-    backgroundSound?: BackgroundSoundResponseDto;
+    reflectionSound?: ReflectionSoundResponseDto;
 }
 

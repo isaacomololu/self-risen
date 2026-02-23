@@ -238,10 +238,10 @@ export class VisionBoardController extends BaseController {
                     description: 'The ID of the reflection session to link to the vision (optional)',
                     example: 'reflection-session-id-123',
                 },
-                backgroundSoundId: {
+                visionSoundId: {
                     type: 'string',
                     nullable: true,
-                    description: 'ID of the background sound from the vision board sound catalog. Pass null to clear (optional)',
+                    description: 'ID of the vision sound from the catalog. Pass null to clear (optional)',
                     example: 'sound-id-123',
                 },
                 image: {
@@ -276,7 +276,7 @@ export class VisionBoardController extends BaseController {
             visionId,
             dto.reflectionSessionId,
             imageFile,
-            dto.backgroundSoundId,
+            dto.visionSoundId,
         );
         if (result.isError) throw result.error;
 
@@ -360,7 +360,7 @@ export class VisionBoardController extends BaseController {
                         properties: {
                             id: { type: 'string' },
                             soundUrl: { type: 'string' },
-                            fileName: { type: 'string', nullable: true },
+                            name: { type: 'string', nullable: true },
                             fileSize: { type: 'number', nullable: true },
                             mimeType: { type: 'string', nullable: true },
                             order: { type: 'number', nullable: true },
@@ -380,7 +380,7 @@ export class VisionBoardController extends BaseController {
         status: 404,
         description: 'User not found',
     })
-    async uploadVisionSound(
+    async uploadSound(
         @FirebaseUser() user: auth.DecodedIdToken,
         @UploadedFiles() soundFiles?: Express.Multer.File[],
     ) {
@@ -388,7 +388,7 @@ export class VisionBoardController extends BaseController {
             throw new BadRequestException('At least one audio file is required');
         }
 
-        const result = await this.visionBoardService.uploadVisionSound(user.uid, soundFiles);
+        const result = await this.visionBoardService.uploadSound(user.uid, soundFiles);
         if (result.isError) throw result.error;
 
         return this.response({
@@ -399,8 +399,8 @@ export class VisionBoardController extends BaseController {
 
     @Get('sounds')
     @ApiOperation({
-        summary: 'Get all audio files for vision board',
-        description: 'Retrieves all audio files that have been uploaded for the vision board, ordered by their display order.',
+        summary: 'Get all sounds',
+        description: 'Retrieves all sounds (catalog used for both visions and reflections), ordered by display order.',
     })
     @ApiResponse({
         status: 200,
@@ -416,7 +416,7 @@ export class VisionBoardController extends BaseController {
                         properties: {
                             id: { type: 'string' },
                             soundUrl: { type: 'string' },
-                            fileName: { type: 'string', nullable: true },
+                            name: { type: 'string', nullable: true },
                             fileSize: { type: 'number', nullable: true },
                             mimeType: { type: 'string', nullable: true },
                             order: { type: 'number', nullable: true },
@@ -432,12 +432,33 @@ export class VisionBoardController extends BaseController {
         status: 404,
         description: 'User not found',
     })
-    async getVisionSounds(@FirebaseUser() user: auth.DecodedIdToken) {
-        const result = await this.visionBoardService.getVisionSounds(user.uid);
+    async getSounds(@FirebaseUser() user: auth.DecodedIdToken) {
+        const result = await this.visionBoardService.getSounds(user.uid);
         if (result.isError) throw result.error;
 
         return this.response({
-            message: 'Audio files retrieved successfully',
+            message: 'Sounds retrieved successfully',
+            data: result.data,
+        });
+    }
+
+    @Get('visions/:id/sounds')
+    @ApiOperation({
+        summary: 'Get sounds in context of a vision',
+        description: 'Returns all sounds plus the vision\'s selected background sound (for picker + current selection).',
+    })
+    @ApiParam({ name: 'id', description: 'Vision ID', example: 'vision-id-123' })
+    @ApiResponse({ status: 200, description: 'Sounds and vision background sound' })
+    @ApiResponse({ status: 404, description: 'User or vision not found' })
+    async getSoundsForVision(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('id') visionId: string,
+    ) {
+        const result = await this.visionBoardService.getSoundsForVision(user.uid, visionId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Sounds retrieved successfully',
             data: result.data,
         });
     }
@@ -520,7 +541,7 @@ export class VisionBoardController extends BaseController {
                         properties: {
                             id: { type: 'string' },
                             order: { type: 'number' },
-                            fileName: { type: 'string', nullable: true },
+                            name: { type: 'string', nullable: true },
                         },
                     },
                 },

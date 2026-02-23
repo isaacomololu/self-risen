@@ -29,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { ReflectionService } from './reflection.service';
-import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, VoicePreferenceDto, EditAffirmationDto, EditBeliefDto, SetBackgroundSoundDto } from './dto';
+import { CreateSessionDto, SubmitBeliefDto, ReflectionSessionResponseDto, ReRecordBeliefDto, CreateWaveDto, UpdateWaveDto, RegenerateVoiceDto, VoicePreferenceDto, EditAffirmationDto, EditBeliefDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -298,40 +298,68 @@ export class ReflectionController extends BaseController {
         });
     }
 
-    @Patch('sessions/:sessionId/background-sound')
+    @Post('sessions/:sessionId/sound')
+    @UseInterceptors(FileInterceptor('file'))
+    @ApiConsumes('multipart/form-data')
     @ApiOperation({
-        summary: 'Set or clear background sound',
-        description: 'Sets the background sound for this reflection session from the vision board sound catalog. Send soundId: null to clear.',
+        summary: 'Create or replace sound for reflection session',
+        description: 'Uploads an audio file as the background sound for this reflection session (1:1). Replaces existing sound if present.',
     })
     @ApiParam({
         name: 'sessionId',
         description: 'The unique identifier of the reflection session',
         example: 'session-id-123',
     })
-    @ApiBody({ type: SetBackgroundSoundDto })
-    @ApiResponse({
-        status: 200,
-        description: 'Background sound updated successfully',
-        type: ReflectionSessionResponseDto,
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                file: { type: 'string', format: 'binary', description: 'Audio file' },
+            },
+            required: ['file'],
+        },
     })
-    @ApiResponse({
-        status: 404,
-        description: 'Reflection session or sound not found',
-    })
-    async setSessionBackgroundSound(
+    @ApiResponse({ status: 200, description: 'Sound created or updated' })
+    @ApiResponse({ status: 400, description: 'No file or upload failed' })
+    @ApiResponse({ status: 404, description: 'Reflection session not found' })
+    async createReflectionSound(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('sessionId') sessionId: string,
-        @Body() dto: SetBackgroundSoundDto,
+        @UploadedFile() file?: Express.Multer.File,
     ) {
-        const result = await this.reflectionService.setSessionBackgroundSound(
-            user.uid,
-            sessionId,
-            dto.soundId ?? null,
-        );
+        if (!file) {
+            throw new BadRequestException('Audio file is required');
+        }
+        const result = await this.reflectionService.createReflectionSound(user.uid, sessionId, file);
         if (result.isError) throw result.error;
 
         return this.response({
-            message: 'Background sound updated successfully',
+            message: 'Sound saved successfully',
+            data: result.data,
+        });
+    }
+
+    @Get('sessions/:sessionId/sound')
+    @ApiOperation({
+        summary: 'Get sound for reflection session',
+        description: 'Returns the reflection session\'s sound (1:1), or null if none set.',
+    })
+    @ApiParam({
+        name: 'sessionId',
+        description: 'The unique identifier of the reflection session',
+        example: 'session-id-123',
+    })
+    @ApiResponse({ status: 200, description: 'Sound or null' })
+    @ApiResponse({ status: 404, description: 'User or reflection session not found' })
+    async getSoundForReflection(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Param('sessionId') sessionId: string,
+    ) {
+        const result = await this.reflectionService.getSoundForReflection(user.uid, sessionId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Sound retrieved successfully',
             data: result.data,
         });
     }
