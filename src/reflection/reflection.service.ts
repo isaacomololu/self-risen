@@ -1430,45 +1430,22 @@ export class ReflectionService extends BaseService {
      * Delete an affirmation from a session
      * Cannot delete if it's the only affirmation or if it's currently selected
      */
-    async deleteAffirmation(firebaseId: string, sessionId: string, affirmationId: string) {
+    async deleteAffirmation(firebaseId: string, affirmationId: string) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        // Validate session ownership
-        const session = await this.prisma.reflectionSession.findFirst({
-            where: {
-                id: sessionId,
-                userId: user.id,
-            },
-            include: {
-                affirmations: true,
-            },
-        });
-
-        if (!session) {
-            return this.HandleError(new NotFoundException('Reflection session not found'));
-        }
-
-        // Validate affirmation belongs to this session
         const affirmation = await this.prisma.affirmation.findFirst({
             where: {
                 id: affirmationId,
-                sessionId: sessionId,
+                session: { userId: user.id },
             },
         });
 
         if (!affirmation) {
             return this.HandleError(
-                new NotFoundException('Affirmation not found or does not belong to this session'),
-            );
-        }
-
-        // Prevent deletion if it's the only affirmation
-        if (session.affirmations.length === 1) {
-            return this.HandleError(
-                new BadRequestException('Cannot delete the only affirmation. Session must have at least one affirmation.'),
+                new NotFoundException('Affirmation not found'),
             );
         }
 
@@ -1490,25 +1467,7 @@ export class ReflectionService extends BaseService {
             //     await this.storageService.deleteFile(affirmation.audioUrl);
             // }
 
-            this.logger.log(`Deleted affirmation ${affirmationId} from session ${sessionId}`);
-
-            // Return updated session
-            const updatedSession = await this.prisma.reflectionSession.findFirst({
-                where: { id: sessionId },
-                include: {
-                    category: {
-                        select: {
-                            id: true,
-                            name: true,
-                        },
-                    },
-                    affirmations: {
-                        orderBy: { createdAt: 'desc' },
-                    },
-                },
-            });
-
-            return this.Results(updatedSession);
+            return this.Results(null);
         } catch (error) {
             this.logger.error(`Error deleting affirmation: ${error.message}`, error.stack);
             return this.HandleError(
