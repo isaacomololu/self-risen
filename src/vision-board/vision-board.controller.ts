@@ -29,7 +29,7 @@ import { FirebaseUser, StreakInterceptor } from 'src/common';
 import { auth } from 'firebase-admin';
 import { BaseController } from 'src/common';
 import { VisionBoardService } from './vision-board.service';
-import { AddVisionDto, AddVisionToGlobalBoardDto, UpdateVisionDto, SetVisionSoundDto, ReorderVisionDto, ReorderSoundDto } from './dto';
+import { AddVisionDto, AddVisionToGlobalBoardDto, UpdateVisionDto, SetVisionSoundDto, ReorderVisionDto, ReorderSoundDto, CreateVisionBoardForCategoryDto } from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -155,6 +155,12 @@ export class VisionBoardController extends BaseController {
         description: 'Filter visions by vision board ID (optional - if not provided, returns visions from all user\'s vision boards)',
         example: 'vision-board-id-123',
     })
+    @ApiQuery({
+        name: 'includeTotalCount',
+        required: false,
+        type: Boolean,
+        description: 'When false, skips the total count query for faster responses (e.g. next page). Default: true',
+    })
     @ApiResponse({
         status: 200,
         description: 'Visions retrieved successfully',
@@ -168,15 +174,18 @@ export class VisionBoardController extends BaseController {
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('visionBoardId') visionBoardId?: string,
+        @Query('includeTotalCount') includeTotalCount?: string,
     ) {
         const pageNumber = page ? parseInt(page, 10) : 1;
         const limitNumber = limit ? parseInt(limit, 10) : 10;
+        const includeTotal = includeTotalCount !== 'false';
 
         const result = await this.visionBoardService.getAllVisions(
             user.uid,
             pageNumber,
             limitNumber,
             visionBoardId,
+            includeTotal,
         );
         if (result.isError) throw result.error;
 
@@ -593,6 +602,33 @@ export class VisionBoardController extends BaseController {
 
         return this.response({
             message: 'Sound reordered successfully',
+            data: result.data,
+        });
+    }
+
+    @Post('boards')
+    @ApiOperation({
+        summary: 'Create a vision board for a category',
+        description: 'Creates a vision board for a specific Wheel of Life category. If the category already has a vision board, returns the existing one. Category must belong to the user\'s wheel.',
+    })
+    @ApiBody({ type: CreateVisionBoardForCategoryDto })
+    @ApiResponse({
+        status: 201,
+        description: 'Vision board created or existing board returned',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User or category not found',
+    })
+    async createVisionBoardForCategory(
+        @FirebaseUser() user: auth.DecodedIdToken,
+        @Body() dto: CreateVisionBoardForCategoryDto,
+    ) {
+        const result = await this.visionBoardService.createVisionBoard(user.uid, dto.categoryId);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: result.data.created ? 'Vision board created' : 'Vision board already exists for this category',
             data: result.data,
         });
     }
