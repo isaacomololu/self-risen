@@ -1333,7 +1333,6 @@ export class ReflectionService extends BaseService {
         const affirmation = await this.prisma.affirmation.findFirst({
             where: {
                 id: affirmationId,
-                session: { userId: user.id },
             },
         });
 
