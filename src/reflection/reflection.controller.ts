@@ -687,50 +687,52 @@ export class ReflectionController extends BaseController {
 
     @Get('affirmations')
     @ApiOperation({
-        summary: 'Get all affirmations (all sessions)',
-        description: 'Retrieves all affirmations for the current user across all reflection sessions, ordered by creation.',
+        summary: 'Get affirmations',
+        description: 'Retrieves affirmations for the current user with pagination. If sessionId is provided, returns only affirmations for that reflection session; otherwise returns all affirmations across sessions, ordered by creation.',
     })
-    @ApiResponse({
-        status: 200,
-        description: 'Affirmations retrieved successfully',
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'User not found',
-    })
-    async getAllAffirmations(@FirebaseUser() user: auth.DecodedIdToken) {
-        const result = await this.reflectionService.getAffirmations(user.uid);
-        if (result.isError) throw result.error;
-
-        return this.response({
-            message: 'Affirmations retrieved successfully',
-            data: result.data,
-        });
-    }
-
-    @Get('sessions/:sessionId/affirmations')
-    @ApiOperation({
-        summary: 'Get affirmations for a session',
-        description: 'Retrieves all generated affirmations for a specific reflection session, ordered by creation.',
-    })
-    @ApiParam({
+    @ApiQuery({
         name: 'sessionId',
-        description: 'The unique identifier of the reflection session',
+        required: false,
+        type: String,
+        description: 'Optional reflection session ID to filter affirmations by session',
         example: 'session-id-123',
     })
+    @ApiQuery({
+        name: 'page',
+        required: false,
+        type: Number,
+        description: 'Page number (default: 1)',
+        example: 1,
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        type: Number,
+        description: 'Items per page (default: 10, max: 100)',
+        example: 10,
+    })
     @ApiResponse({
         status: 200,
         description: 'Affirmations retrieved successfully',
     })
     @ApiResponse({
         status: 404,
-        description: 'Reflection session not found',
+        description: 'User or reflection session not found',
     })
-    async getAffirmationsForSession(
+    async getAffirmations(
         @FirebaseUser() user: auth.DecodedIdToken,
-        @Param('sessionId') sessionId: string,
+        @Query('sessionId') sessionId?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
     ) {
-        const result = await this.reflectionService.getAffirmations(user.uid, sessionId);
+        const pageNumber = page ? parseInt(page, 10) : 1;
+        const limitNumber = limit ? parseInt(limit, 10) : 10;
+        const result = await this.reflectionService.getAffirmations(
+            user.uid,
+            sessionId,
+            pageNumber,
+            limitNumber,
+        );
         if (result.isError) throw result.error;
 
         return this.response({

@@ -1168,35 +1168,27 @@ export class ReflectionService extends BaseService {
     /**
      * Get all affirmations for a session
      */
-    async getAffirmations(firebaseId: string, sessionId?: string) {
+    async getAffirmations(
+        firebaseId: string,
+        sessionId?: string,
+        page: number = 1,
+        limit: number = 10,
+    ) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        let affirmations;
-        if (!sessionId) {
-            affirmations = await this.prisma.affirmation.findMany({
-                where: {
-                    sessionId,
-                    session: { userId: user.id },
-                },
-                orderBy: { createdAt: 'desc' },
-            });
+        const pageNumber = Math.max(1, Math.floor(page));
+        const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
+        const skip = (pageNumber - 1) * pageSize;
 
-            return this.Results(affirmations);
-        }
+        const whereClause = sessionId
+            ? { sessionId, session: { userId: user.id } }
+            : { session: { userId: user.id } };
 
-        affirmations = await this.prisma.affirmation.findMany({
-            where: {
-                sessionId,
-                session: { userId: user.id },
-            },
-            orderBy: { createdAt: 'desc' },
-        });
-
-        // If empty, distinguish "session does not exist" from "session has no affirmations"
-        if (affirmations.length === 0) {
+        // When filtering by session, validate it exists before querying (so we can return 404 if invalid)
+        if (sessionId) {
             const sessionExists = await this.prisma.reflectionSession.findFirst({
                 where: { id: sessionId, userId: user.id },
                 select: { id: true },
@@ -1206,7 +1198,40 @@ export class ReflectionService extends BaseService {
             }
         }
 
-        return this.Results(affirmations);
+        const [totalCount, affirmations] = await Promise.all([
+            this.prisma.affirmation.count({ where: whereClause }),
+            this.prisma.affirmation.findMany({
+                where: whereClause,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: pageSize,
+                ...(sessionId
+                    ? {}
+                    : {
+                          include: {
+                              session: {
+                                  select: {
+                                      userAffirmationAudioUrl: true,
+                                  },
+                              },
+                          },
+                      }),
+            }),
+        ]);
+
+        const totalPages = Math.ceil(totalCount / pageSize);
+
+        return this.Results({
+            data: affirmations,
+            pagination: {
+                page: pageNumber,
+                limit: pageSize,
+                total: totalCount,
+                totalPages,
+                hasNextPage: pageNumber < totalPages,
+                hasPreviousPage: pageNumber > 1,
+            },
+        });
     }
 
     /**
