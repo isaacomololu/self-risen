@@ -685,10 +685,33 @@ export class ReflectionController extends BaseController {
         });
     }
 
+    @Get('affirmations')
+    @ApiOperation({
+        summary: 'Get all affirmations (all sessions)',
+        description: 'Retrieves all affirmations for the current user across all reflection sessions, ordered by creation.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmations retrieved successfully',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'User not found',
+    })
+    async getAllAffirmations(@FirebaseUser() user: auth.DecodedIdToken) {
+        const result = await this.reflectionService.getAffirmations(user.uid);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Affirmations retrieved successfully',
+            data: result.data,
+        });
+    }
+
     @Get('sessions/:sessionId/affirmations')
     @ApiOperation({
-        summary: 'Get all affirmations for a session',
-        description: 'Retrieves all generated affirmations for a reflection session, ordered by creation.',
+        summary: 'Get affirmations for a session',
+        description: 'Retrieves all generated affirmations for a specific reflection session, ordered by creation.',
     })
     @ApiParam({
         name: 'sessionId',
@@ -703,7 +726,7 @@ export class ReflectionController extends BaseController {
         status: 404,
         description: 'Reflection session not found',
     })
-    async getAffirmations(
+    async getAffirmationsForSession(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('sessionId') sessionId: string,
     ) {

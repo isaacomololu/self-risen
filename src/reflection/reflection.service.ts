@@ -1168,13 +1168,26 @@ export class ReflectionService extends BaseService {
     /**
      * Get all affirmations for a session
      */
-    async getAffirmations(firebaseId: string, sessionId: string) {
+    async getAffirmations(firebaseId: string, sessionId?: string) {
         const user = await this.getUserByFirebaseId(firebaseId);
         if (!user) {
             return this.HandleError(new NotFoundException('User not found'));
         }
 
-        const affirmations = await this.prisma.affirmation.findMany({
+        let affirmations;
+        if (!sessionId) {
+            affirmations = await this.prisma.affirmation.findMany({
+                where: {
+                    sessionId,
+                    session: { userId: user.id },
+                },
+                orderBy: { createdAt: 'desc' },
+            });
+
+            return this.Results(affirmations);
+        }
+
+        affirmations = await this.prisma.affirmation.findMany({
             where: {
                 sessionId,
                 session: { userId: user.id },
