@@ -1212,6 +1212,7 @@ export class ReflectionService extends BaseService {
                               session: {
                                   select: {
                                       userAffirmationAudioUrl: true,
+                                      isGlobal: true,
                                   },
                               },
                           },
