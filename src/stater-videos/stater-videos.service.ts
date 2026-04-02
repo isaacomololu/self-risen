@@ -12,47 +12,47 @@ export class StaterVideosService extends BaseService {
 
     async getFileUrls() {
         const light = [
+            // {
+            //     url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/60fda64b-d84a-4b8f-b160-2cf95ef1fa3b-1768767978757.mp4',
+            //     name: 'bright-glow'
+            // },
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/60fda64b-d84a-4b8f-b160-2cf95ef1fa3b-1768767978757.mp4',
-                name: 'bright-glow'
-            },
-            {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/sign/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/2576579a-74d7-4c20-b666-02ce10c8cfee-1768769720552.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zMmE2ZWM2Zi1iZDNjLTRmY2YtYTVmYS1hNjVhZDVmM2E4ODEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ1cGxvYWRzL3ZpZGVvcy9zdGFydGVycy90N0Q1N25GYm5TUGxGUnVadzR1WnFJdUpMMlkyLzI1NzY1NzlhLTc0ZDctNGMyMC1iNjY2LTAyY2UxMGM4Y2ZlZS0xNzY4NzY5NzIwNTUyLm1wNCIsImlhdCI6MTc2ODc2OTcyNSwiZXhwIjoxODAwMzA1NzI1fQ.IRpDuf2WqjoEaXl6oHYy3GP5aAGqlya0JP8UbCH8BdQ',
+                url: 'https://satyfurcysfjxwfhcizv.supabase.co/storage/v1/object/public/uploads/videos/starters/OrUQsjFHWOdTMmDzuD71Fl6AVgA3/832d2098-11fe-40d6-a514-f25eb36a5c31-1775146711989.mp4',
                 name: 'golden-waves'
             },
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/a21d4816-c61d-4f7a-a0e5-9e9d94b2f9a5-1768769492174.mp4',
+                url: 'https://satyfurcysfjxwfhcizv.supabase.co/storage/v1/object/public/uploads/videos/starters/OrUQsjFHWOdTMmDzuD71Fl6AVgA3/e7c06a04-7426-4d61-a0eb-3ee6e728cdfa-1775147474510.mp4',
                 name: 'golden-sun'
             },
             {
                 url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/78a8efd8-a10c-4b48-a309-832b46ffa034-1768768252248.mp4',
                 name: 'ocean-view'
             },
-            {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/a8efb95b-b8d8-4372-bf2e-732cccb343b6-1768768401303.mp4',
-                name: 'sun'
-            }
+            // {
+            //     url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/a8efb95b-b8d8-4372-bf2e-732cccb343b6-1768768401303.mp4',
+            //     name: 'sun'
+            // }
         ];
 
         const dark = [
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/8daaae55-05bd-41f9-8516-6878cbc4ba61-1768767385079.mp4',
+                url: 'https://satyfurcysfjxwfhcizv.supabase.co/storage/v1/object/public/uploads/videos/starters/OrUQsjFHWOdTMmDzuD71Fl6AVgA3/b65073de-3d15-4db7-b5d4-4e15a884c238-1775150837039.mp4',
                 name: 'Axis'
             },
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/25efc70c-850c-49e7-976f-38dc71c30d16-1768767809604.mp4',
+                url: 'https://satyfurcysfjxwfhcizv.supabase.co/storage/v1/object/public/uploads/videos/starters/OrUQsjFHWOdTMmDzuD71Fl6AVgA3/0d9876c0-69a2-462b-a9f5-ecb257d16359-1775147923266.mp4',
                 name: 'mystic-forest'
             },
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/sign/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/383c2d28-28ad-48c2-8cd1-20dae48d4bd9-1768770299191.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zMmE2ZWM2Zi1iZDNjLTRmY2YtYTVmYS1hNjVhZDVmM2E4ODEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ1cGxvYWRzL3ZpZGVvcy9zdGFydGVycy90N0Q1N25GYm5TUGxGUnVadzR1WnFJdUpMMlkyLzM4M2MyZDI4LTI4YWQtNDhjMi04Y2QxLTIwZGFlNDhkNGJkOS0xNzY4NzcwMjk5MTkxLm1wNCIsImlhdCI6MTc2ODc3MDMzNCwiZXhwIjoxODAwMzA2MzM0fQ.giYQ6rJmexqpNeKMnsiX2WUziCUdQn-yYCl6pAeLr1Y',
+                url: 'https://satyfurcysfjxwfhcizv.supabase.co/storage/v1/object/public/uploads/videos/starters/OrUQsjFHWOdTMmDzuD71Fl6AVgA3/912eba84-76e0-4cf8-b805-fb6999cb48a2-1775146277440.mp4',
                 name: 'high-sea'
             },
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/sign/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/383c2d28-28ad-48c2-8cd1-20dae48d4bd9-1768770299191.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zMmE2ZWM2Zi1iZDNjLTRmY2YtYTVmYS1hNjVhZDVmM2E4ODEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ1cGxvYWRzL3ZpZGVvcy9zdGFydGVycy90N0Q1N25GYm5TUGxGUnVadzR1WnFJdUpMMlkyLzM4M2MyZDI4LTI4YWQtNDhjMi04Y2QxLTIwZGFlNDhkNGJkOS0xNzY4NzcwMjk5MTkxLm1wNCIsImlhdCI6MTc2ODc3MDMzNCwiZXhwIjoxODAwMzA2MzM0fQ.giYQ6rJmexqpNeKMnsiX2WUziCUdQn-yYCl6pAeLr1Y',
+                url: 'https://satyfurcysfjxwfhcizv.supabase.co/storage/v1/object/public/uploads/videos/starters/OrUQsjFHWOdTMmDzuD71Fl6AVgA3/123e3b0c-ebe6-4997-b77b-ffe7ac44fce7-1775147688657.mp4',
                 name: 'ice'
             },
             {
-                url: 'https://lstprxumviehmvbebcub.supabase.co/storage/v1/object/public/uploads/videos/starters/t7D57nFbnSPlFRuZw4uZqIuJL2Y2/035f30f3-6693-4951-b6be-f391d55916a4-1768767627923.mp4',
+                url: 'https://satyfurcysfjxwfhcizv.supabase.co/storage/v1/object/public/uploads/videos/starters/OrUQsjFHWOdTMmDzuD71Fl6AVgA3/bf8317cd-a8a2-40d7-a402-7a1d4ef67138-1775146979127.mp4',
                 name: 'space-odyssey'
             }
         ];
