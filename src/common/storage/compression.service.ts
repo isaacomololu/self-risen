@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
 import ffmpeg from 'fluent-ffmpeg';
-import { Readable } from 'stream';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { config } from '../config';
 
 export interface CompressionResult {
@@ -170,6 +172,7 @@ export class CompressionService {
       const compressedBuffer = await this.compressVideoWithFfmpeg(
         file.buffer,
         targetBitrate,
+        file.mimetype,
       );
 
       const compressedSize = compressedBuffer.length;
@@ -214,59 +217,68 @@ export class CompressionService {
   }
 
   /**
-   * Compress video buffer using ffmpeg
+   * Get file extension from MIME type for temp file creation
+   */
+  private getExtensionFromMime(mimetype: string): string {
+    const mimeToExt: Record<string, string> = {
+      'video/mp4': '.mp4',
+      'video/quicktime': '.mov',
+      'video/x-msvideo': '.avi',
+      'video/webm': '.webm',
+      'video/mpeg': '.mpeg',
+      'video/ogg': '.ogv',
+    };
+    return mimeToExt[mimetype] || '.mp4';
+  }
+
+  /**
+   * Compress video buffer using ffmpeg with temp files
+   * Uses temp files instead of streams so ffmpeg can seek (required for MOV, AVI, etc.)
    */
   private async compressVideoWithFfmpeg(
     inputBuffer: Buffer,
     targetBitrate: string,
+    mimetype: string = 'video/mp4',
   ): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      let hasError = false;
+    const inputExt = this.getExtensionFromMime(mimetype);
+    const tmpDir = os.tmpdir();
+    const inputPath = path.join(tmpDir, `ffmpeg-input-${Date.now()}${inputExt}`);
+    const outputPath = path.join(tmpDir, `ffmpeg-output-${Date.now()}.mp4`);
 
-      // Create readable stream from buffer
-      const inputStream = Readable.from(inputBuffer);
+    try {
+      // Write input buffer to temp file so ffmpeg can seek
+      fs.writeFileSync(inputPath, inputBuffer);
 
-      const command = ffmpeg(inputStream)
-        .inputFormat('mp4') // Try to auto-detect, but specify if known
-        .videoCodec('libx264')
-        .audioCodec('aac')
-        .outputOptions([
-          '-preset fast',
-          `-b:v ${targetBitrate}`,
-          '-movflags +faststart', // Optimize for web streaming
-          '-crf 23', // Constant rate factor for quality
-          '-f mp4', // Force MP4 format
-        ])
-        .format('mp4')
-        .on('error', (err) => {
-          if (!hasError) {
-            hasError = true;
+      const compressedBuffer = await new Promise<Buffer>((resolve, reject) => {
+        ffmpeg(inputPath)
+          .videoCodec('libx264')
+          .audioCodec('aac')
+          .outputOptions([
+            '-preset fast',
+            `-b:v ${targetBitrate}`,
+            '-movflags +faststart',
+            '-crf 23',
+          ])
+          .format('mp4')
+          .on('error', (err) => {
             reject(new Error(`ffmpeg error: ${err.message}`));
-          }
-        })
-        .on('end', () => {
-          if (!hasError) {
-            const compressedBuffer = Buffer.concat(chunks);
-            resolve(compressedBuffer);
-          }
-        });
+          })
+          .on('end', () => {
+            try {
+              const result = fs.readFileSync(outputPath);
+              resolve(result);
+            } catch (readErr) {
+              reject(new Error(`Failed to read compressed output: ${readErr.message}`));
+            }
+          })
+          .save(outputPath);
+      });
 
-      // Pipe output to collect compressed data
-      const outputStream = command.pipe();
-      outputStream.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-      outputStream.on('error', (err) => {
-        if (!hasError) {
-          hasError = true;
-          reject(new Error(`Stream error: ${err.message}`));
-        }
-      });
-      outputStream.on('end', () => {
-        // This might fire before the 'end' event on command
-        // The command 'end' event will resolve the promise
-      });
-    });
+      return compressedBuffer;
+    } finally {
+      // Clean up temp files
+      try { fs.unlinkSync(inputPath); } catch {}
+      try { fs.unlinkSync(outputPath); } catch {}
+    }
   }
 }

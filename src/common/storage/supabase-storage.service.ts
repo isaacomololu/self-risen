@@ -276,7 +276,7 @@ export class SupabaseStorageService {
 
             // Upload file to Supabase Storage
             const uploadStartTime = Date.now();
-            const { data, error } = await this.supabase!.storage
+            const { error } = await this.supabase!.storage
                 .from(this.bucketName!)
                 .upload(filePath, file.buffer, {
                     contentType: file.mimetype,
@@ -317,25 +317,15 @@ export class SupabaseStorageService {
 
             this.logger.log(`File uploaded successfully. Path: ${filePath}`);
 
-            // Get signed URL (works for both public and private buckets)
-            // Using 1 year expiration (31536000 seconds) to match Firebase's far-future date
-            this.logger.debug('Generating signed URL...');
-            const { data: signedUrlData, error: signedUrlError } = await this.supabase!.storage
+            // Get public URL (bucket must be set to public in Supabase Dashboard)
+            this.logger.debug('Generating public URL...');
+            const { data: publicUrlData } = this.supabase!.storage
                 .from(this.bucketName!)
-                .createSignedUrl(filePath, 31536000);
-
-            if (signedUrlError || !signedUrlData) {
-                this.logger.error(
-                    `Failed to generate signed URL - Error: ${JSON.stringify(signedUrlError)}`,
-                );
-                throw new BadRequestException(
-                    `Failed to get signed URL: ${signedUrlError?.message || 'Unknown error'}`,
-                );
-            }
+                .getPublicUrl(filePath);
 
             this.logger.log(`Upload completed successfully for file: ${file.originalname}`);
             return {
-                url: signedUrlData.signedUrl,
+                url: publicUrlData.publicUrl,
                 path: filePath,
                 fileName: file.originalname,
                 contentType: file.mimetype,
