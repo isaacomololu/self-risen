@@ -149,10 +149,10 @@ export class VisionBoardService extends BaseService {
                     new BadRequestException('Reflection session must be in AFFIRMATION_GENERATED status to add to vision board'),
                 );
             }
-            const existingItem = await this.prisma.vision.findUnique({
-                where: { reflectionSessionId },
+            const existingVision = await this.prisma.vision.findFirst({
+                where: { visionBoardId, reflectionSessionId },
             });
-            if (existingItem) {
+            if (existingVision) {
                 return this.HandleError(
                     new BadRequestException('This reflection session is already in the vision board'),
                 );
@@ -419,8 +419,8 @@ export class VisionBoardService extends BaseService {
                         userId: user.id,
                     },
                 }),
-                this.prisma.vision.findUnique({
-                    where: { reflectionSessionId },
+                this.prisma.vision.findFirst({
+                    where: { visionBoardId: visionItem.visionBoardId, reflectionSessionId },
                 }),
             ]);
 

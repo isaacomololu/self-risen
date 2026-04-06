@@ -238,7 +238,7 @@ model ReflectionSession {
   createdAt                   DateTime                @default(now())
   updatedAt                   DateTime                @updatedAt
   completedAt                 DateTime?
-  vision                      Vision?
+  vision                      Vision[]
   waves                       Wave[]
   affirmations                Affirmation[]
   reflectionSound             ReflectionSound?
@@ -302,7 +302,7 @@ model Vision {
   id                  String             @id @default(uuid())
   visionBoardId       String
   visionBoard         VisionBoard        @relation(fields: [visionBoardId], references: [id], onDelete: Cascade)
-  reflectionSessionId String?            @unique
+  reflectionSessionId String?
   reflectionSession   ReflectionSession? @relation(fields: [reflectionSessionId], references: [id], onDelete: Cascade)
   imageUrl            String?
   order               Int?
@@ -311,6 +311,7 @@ model Vision {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
+  @@unique([visionBoardId, reflectionSessionId])
   @@index([visionBoardId])
   @@index([reflectionSessionId])
   @@index([visionBoardId, order])
