@@ -90,6 +90,10 @@ describe('ReflectionService', () => {
         update: jest.fn(),
         count: jest.fn(),
       },
+      affirmation: {
+        create: jest.fn(),
+        update: jest.fn(),
+      },
       reflectionSound: {
         create: jest.fn(),
         update: jest.fn(),
@@ -390,6 +394,7 @@ describe('ReflectionService', () => {
       ...mockSession,
       status: 'BELIEF_CAPTURED',
       rawBeliefText: 'I am not healthy',
+      affirmations: [] as any[],
     };
 
     it('should successfully generate affirmation', async () => {
@@ -400,6 +405,17 @@ describe('ReflectionService', () => {
         generatedAffirmation: 'I am healthy and vibrant',
       });
       mockTextToSpeechService.generateAffirmationAudio.mockResolvedValue('https://audio-url.com/audio.mp3');
+      mockPrisma.affirmation.create.mockResolvedValue({
+        id: 'affirmation-123',
+        sessionId: 'session-123',
+        affirmationText: 'I am healthy and vibrant',
+        audioUrl: 'https://audio-url.com/audio.mp3',
+        isSelected: true,
+        order: 0,
+        ttsVoicePreference: TtsVoicePreference.MALE_CONFIDENT,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
       mockPrisma.reflectionSession.update.mockResolvedValue({
         ...sessionWithBelief,
         status: 'AFFIRMATION_GENERATED',
@@ -412,6 +428,59 @@ describe('ReflectionService', () => {
 
       expect(result.isError).toBe(false);
       expect(result.data?.status).toBe('AFFIRMATION_GENERATED');
+      expect(mockPrisma.affirmation.create).toHaveBeenCalled();
+    });
+
+    it('should override payload and not persist when OMNI safety gate triggers', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockPrisma.reflectionSession.findFirst.mockResolvedValue(sessionWithBelief);
+      mockNlpTransformationService.transformBelief.mockResolvedValue({
+        limitingBelief: 'I am not healthy',
+        generatedAffirmation: '',
+        omni: {
+          isSafetyIssue: true,
+          isThirdPartyConcern: false,
+          riskType: 'self_harm',
+          riskLevel: 'elevated',
+          isPersonalBelief: true,
+          inputType: 'safety',
+          intensity: 'High',
+          detectedDistortion: null,
+          primaryEmotion: 'Crisis',
+          supportType: 'safety',
+          reflectiveSummary: 'Safety guidance',
+          generatedAffirmation: null,
+          socraticPivot: null,
+          confidence: 'High',
+        },
+      });
+
+      mockPrisma.reflectionSession.update.mockResolvedValue({
+        ...sessionWithBelief,
+        status: 'AFFIRMATION_GENERATED',
+        selectedAffirmationText:
+          'This sounds serious. I’m concerned about your immediate safety. Please contact your local emergency services, go to the nearest emergency room, or reach out to a trusted person who can help you right now.',
+        selectedAffirmationAudioUrl: null,
+        category: mockCategory,
+      });
+
+      const result = await service.generateAffirmation('firebase-uid-123', 'session-123');
+
+      expect(result.isError).toBe(false);
+      expect(result.data?.status).toBe('AFFIRMATION_GENERATED');
+      expect((result.data as any)?.isSafetyOverride).toBe(true);
+      expect((result.data as any)?.userMessage).toBe(
+        'This sounds serious. I’m concerned about your immediate safety. Please contact your local emergency services, go to the nearest emergency room, or reach out to a trusted person who can help you right now.',
+      );
+      expect(mockPrisma.affirmation.create).not.toHaveBeenCalled();
+      expect(mockTextToSpeechService.generateAffirmationAudio).not.toHaveBeenCalled();
+      expect(mockPrisma.reflectionSession.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            selectedAffirmationAudioUrl: null,
+          }),
+        }),
+      );
     });
 
     it('should return error when session not in BELIEF_CAPTURED status', async () => {
