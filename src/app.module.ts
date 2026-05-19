@@ -19,10 +19,12 @@ import * as path from 'path';
 import { config } from './common';
 import { CommonModule } from './common/common.module';
 import { StaterVideosModule } from './stater-videos/stater-videos.module';
+import { AffirmationLoopModule } from './affirmation-loop/affirmation-loop.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    NotificationsModule,
     CommonModule,
     FirebaseAdminModule.forRootAsync({
       useFactory: () => {
@@ -180,13 +182,13 @@ import { StaterVideosModule } from './stater-videos/stater-videos.module';
     AuthModule,
     UserModule,
     DatabaseModule,
-    NotificationsModule,
     WheelOfLifeModule,
     StorageModule,
     ReflectionModule,
     VisionBoardModule,
     JournalModule,
     StaterVideosModule,
+    AffirmationLoopModule,
     // JwtModule.registerAsync({
     //   useFactory: () => ({
     //     secret: config.JWT_SECRET,

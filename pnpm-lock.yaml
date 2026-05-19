@@ -68,12 +68,18 @@ importers:
       cache-manager:
         specifier: ^5.7.6
         version: 5.7.6
+      city-timezones:
+        specifier: ^1.3.4
+        version: 1.3.4
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
       class-validator:
         specifier: ^0.14.1
         version: 0.14.2
+      countries-and-timezones:
+        specifier: ^3.9.0
+        version: 3.9.0
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
@@ -2252,6 +2258,9 @@ packages:
   citty@0.1.6:
     resolution: {integrity: sha512-tskPPKEs8D2KPafUypv2gxwJP8h/OaJmC82QQGGDQcHvXX43xF2VDACcJVmZ0EuSxkpO9Kc4MlrA3q0+FG58AQ==}
 
+  city-timezones@1.3.4:
+    resolution: {integrity: sha512-yLmtCxU4y5HLAw9XGIMcGEXO+R2KH1sb595wEQC/E9BxSDpazCD7v9ZQRySO7367IXWsWqt3z2xFVh3OkZdgEQ==}
+
   cjs-module-lexer@2.1.0:
     resolution: {integrity: sha512-UX0OwmYRYQQetfrLEZeewIFFI+wSTofC+pMBLNuH3RUuu/xzG1oz84UCEDOSoQlN3fZ4+AzmV50ZYvGqkMh9yA==}
 
@@ -2372,6 +2381,10 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  countries-and-timezones@3.9.0:
+    resolution: {integrity: sha512-3upkVtUfZgdp5xOQI/Deg1ye73ae6bygJMO4UvtUi6wLjwcj7cBqx2PzSZ1VL8i5iveBbjhsQp2Judx7kPKivA==}
+    engines: {node: '>=8.x', npm: '>=5.x'}
 
   create-require@1.1.1:
     resolution: {integrity: sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==}
@@ -7091,6 +7104,8 @@ snapshots:
     dependencies:
       consola: 3.4.2
 
+  city-timezones@1.3.4: {}
+
   cjs-module-lexer@2.1.0: {}
 
   class-transformer@0.5.1: {}
@@ -7193,6 +7208,8 @@ snapshots:
       path-type: 4.0.0
     optionalDependencies:
       typescript: 5.8.3
+
+  countries-and-timezones@3.9.0: {}
 
   create-require@1.1.1: {}
 

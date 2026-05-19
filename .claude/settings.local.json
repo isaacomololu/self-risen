@@ -8,5 +8,9 @@
       "Bash(mkdir:*)",
       "Bash(xargs:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "aibtc"
+  ],
+  "enableAllProjectMcpServers": true
 }

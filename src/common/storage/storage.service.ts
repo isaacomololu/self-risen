@@ -1,5 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import * as fs from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
 import { SupabaseStorageService } from './supabase-storage.service';
@@ -372,6 +376,67 @@ export class StorageService {
     } catch (error) {
       throw new BadRequestException(
         `Failed to get signed URL: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Download a file from a URL or storage path to a local path.
+   */
+  async downloadToFile(source: string, destPath: string): Promise<void> {
+    const url = source.startsWith('http://') || source.startsWith('https://')
+      ? source
+      : await this.getSignedUrl(source, '1h');
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new BadRequestException(
+        `Failed to download file: HTTP ${response.status}`,
+      );
+    }
+
+    if (!response.body) {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await fs.writeFile(destPath, buffer);
+      return;
+    }
+
+    const nodeStream = Readable.fromWeb(response.body as import('stream/web').ReadableStream);
+    await pipeline(nodeStream, createWriteStream(destPath));
+  }
+
+  /**
+   * Upload a buffer to an explicit storage path (e.g. loops/{userId}/{loopId}.mp3).
+   */
+  async uploadBufferAtPath(
+    buffer: Buffer,
+    filePath: string,
+    contentType: string,
+  ): Promise<UploadResult> {
+    if (this.provider === StorageProvider.SUPABASE) {
+      return this.supabaseService!.uploadBufferAtPath(buffer, filePath, contentType);
+    }
+
+    try {
+      const fileRef = this.bucket.file(filePath);
+      await fileRef.save(buffer, {
+        metadata: { contentType },
+        public: false,
+      });
+      const [url] = await fileRef.getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500',
+      });
+      return {
+        url,
+        path: filePath,
+        fileName: filePath.split('/').pop() ?? filePath,
+        contentType,
+        size: buffer.length,
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to upload file: ${error.message}`,
       );
     }
   }

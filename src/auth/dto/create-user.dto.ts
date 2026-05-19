@@ -1,16 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, IsOptional } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length } from 'class-validator';
+import { UserLocaleDto } from './user-locale.dto';
 
-export class SignUp {
+export class SignUp extends UserLocaleDto {
     @ApiProperty({ required: true })
     @IsNotEmpty()
     @IsString()
     name: string;
-
-    // @ApiProperty({ required: true })
-    // @IsNotEmpty()
-    // @IsString()
-    // lastName: string;
 
     @ApiProperty({ required: true })
     @IsNotEmpty()
@@ -21,4 +17,23 @@ export class SignUp {
     @IsNotEmpty()
     @IsString()
     password: string;
+
+    @ApiProperty({
+        required: true,
+        description: 'ISO 3166-1 alpha-2 country code',
+        example: 'US',
+    })
+    @IsNotEmpty()
+    @IsString()
+    @Length(2, 2, { message: 'countryCode must be a 2-letter ISO code' })
+    declare countryCode: string;
+
+    @ApiProperty({
+        required: true,
+        description: 'City name; server derives timezone from country and city',
+        example: 'Chicago',
+    })
+    @IsNotEmpty()
+    @IsString()
+    declare city: string;
 }

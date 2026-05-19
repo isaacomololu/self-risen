@@ -17,8 +17,9 @@ import {
   ResetPasswordDto,
   VerifyPasswordResetOtpDto,
   GoogleSignInDto,
-  AppleSignInDto
+  AppleSignInDto,
 } from './dto';
+import { buildUserLocaleUpdate } from './utils/user-locale.util';
 import { auth } from 'firebase-admin';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
 import { NotificationTypeEnum, NotificationChannelTypeEnum, NotificationStatusEnum } from 'src/notifications/enums/notification.enum';
@@ -68,12 +69,23 @@ export class AuthService extends BaseService {
     }
 
     try {
+      const localeData = buildUserLocaleUpdate(payload) ?? {};
+
+      if (!localeData.timezone) {
+        return this.HandleError(
+          new ConflictException(
+            'Could not determine timezone from country and city. Use a recognized city name for the given country.',
+          ),
+        );
+      }
+
       const user = await this.prisma.user.create({
         data: {
           firebaseId: firebaseUser.uid,
           email,
           name,
-          lastLoggedInAt: new Date()
+          lastLoggedInAt: new Date(),
+          ...localeData,
         }
       });
 
@@ -171,12 +183,11 @@ export class AuthService extends BaseService {
         );
       }
 
-      // Update last logged in time
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          lastLoggedInAt: new Date()
-        }
+          lastLoggedInAt: new Date(),
+        },
       });
 
       return this.Results({
@@ -235,7 +246,7 @@ export class AuthService extends BaseService {
           name,
           existingUser: user,
           avatar: picture,
-          emailVerified: tokenInfo.email_verified === 'true'
+          emailVerified: tokenInfo.email_verified === 'true',
         });
         user = result.user;
         firebaseUid = result.firebaseUid;
@@ -352,7 +363,7 @@ export class AuthService extends BaseService {
           email,
           name: name || email.split('@')[0],
           existingUser: user,
-          emailVerified
+          emailVerified,
         });
         user = result.user;
         firebaseUid = result.firebaseUid;
@@ -935,7 +946,9 @@ export class AuthService extends BaseService {
       const firebaseUid = existingUser.firebaseId;
       const user = await this.prisma.user.update({
         where: { id: existingUser.id },
-        data: { lastLoggedInAt: new Date() }
+        data: {
+          lastLoggedInAt: new Date(),
+        },
       });
       return { user, firebaseUid };
     }
@@ -966,19 +979,23 @@ export class AuthService extends BaseService {
           email,
           name,
           ...(avatar !== undefined && { avatar }),
-          lastLoggedInAt: new Date()
-        }
+          lastLoggedInAt: new Date(),
+        },
       });
       return { user, firebaseUid };
     } catch (error) {
       if (error.code === 'P2002') {
         const user = await this.prisma.user.findUnique({
-          where: { email }
+          where: { email },
         });
         if (!user) {
           throw new ConflictException('Failed to create user account');
         }
-        return { user, firebaseUid: user.firebaseId };
+        const updated = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoggedInAt: new Date() },
+        });
+        return { user: updated, firebaseUid: user.firebaseId };
       }
       throw error;
     }

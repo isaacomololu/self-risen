@@ -106,6 +106,8 @@ describe('AuthService', () => {
       name: 'Test User',
       email: 'test@example.com',
       password: 'Password123!',
+      countryCode: 'US',
+      city: 'Chicago',
     };
 
     it('should successfully create a new user', async () => {
@@ -125,6 +127,50 @@ describe('AuthService', () => {
         password: signUpPayload.password,
         displayName: signUpPayload.name,
       });
+    });
+
+    it('should derive timezone from country and city when timezone omitted', async () => {
+      const firebaseUser = { uid: 'firebase-uid-123' };
+      mockFirebaseAuth.createUser.mockResolvedValue(firebaseUser);
+      mockPrisma.user.create.mockResolvedValue(mockUser);
+
+      await service.signUp(signUpPayload);
+
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            timezone: 'America/Chicago',
+            countryCode: 'US',
+            city: 'Chicago',
+            locationUpdatedAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should persist locale and derived timezone on signup', async () => {
+      const firebaseUser = { uid: 'firebase-uid-123' };
+      mockFirebaseAuth.createUser.mockResolvedValue(firebaseUser);
+      mockPrisma.user.create.mockResolvedValue(mockUser);
+
+      await service.signUp({
+        ...signUpPayload,
+        locale: 'en-US',
+        countryCode: 'US',
+        city: 'New York',
+      });
+
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            timezone: 'America/New_York',
+            locale: 'en-US',
+            countryCode: 'US',
+            city: 'New York',
+            locationUpdatedAt: expect.any(Date),
+          }),
+        }),
+      );
     });
 
     it('should return error when email already exists in Firebase', async () => {

@@ -9,7 +9,6 @@ import { NlpTransformationService } from './services/nlp-transformation.service'
 import { TextToSpeechService } from './services/text-to-speech.service';
 import { SessionExpirationService } from './services/session-expiration.service';
 import { CommonModule } from 'src/common/common.module';
-import { NotificationsModule } from 'src/notifications/notifications.module';
 import { UserModule } from 'src/user/user.module';
 import { StaterVideosModule } from 'src/stater-videos/stater-videos.module';
 
@@ -18,7 +17,6 @@ import { StaterVideosModule } from 'src/stater-videos/stater-videos.module';
         CommonModule,
         DatabaseModule,
         StorageModule,
-        NotificationsModule,
         UserModule, // Import to access TokenUsageService
         StaterVideosModule,
         ScheduleModule.forRoot()
@@ -31,7 +29,7 @@ import { StaterVideosModule } from 'src/stater-videos/stater-videos.module';
         TextToSpeechService,
         SessionExpirationService,
     ],
-    exports: [ReflectionService],
+    exports: [ReflectionService, TextToSpeechService],
 })
 export class ReflectionModule { }
 

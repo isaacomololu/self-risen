@@ -3,7 +3,8 @@ import { ConflictException, Injectable, Logger, NotFoundException, UnauthorizedE
 import { User } from '@prisma/client';
 import { DatabaseProvider } from 'src/database/database.provider';
 import { BaseService, FileType, StorageService } from 'src/common';
-import { ChangeNameDto, ChangeUsernameDto, ChangeTtsVoicePreferenceDto, UpdateStreakReminderPreferencesDto } from './dto';
+import { ChangeNameDto, ChangeUsernameDto, ChangeTtsVoicePreferenceDto, UpdateStreakReminderPreferencesDto, UpdateUserDto } from './dto';
+import { buildUserLocaleUpdate } from 'src/auth/utils/user-locale.util';
 import { TextToSpeechService } from 'src/reflection/services/text-to-speech.service';
 import { UploadAvatarDto } from './dto/upload-avatar.dto';
 import { config } from 'src/common';
@@ -116,6 +117,114 @@ export class UserService extends BaseService {
         daysUntilReset,
       }
     });
+  }
+
+  async updateUser(firebaseId: string, payload: UpdateUserDto) {
+    const existing = await this.prisma.user.findUnique({
+      where: { firebaseId },
+    });
+
+    if (!existing) {
+      return this.HandleError(new NotFoundException('User not found'));
+    }
+
+    const hasLocationUpdate =
+      payload.countryCode !== undefined || payload.city !== undefined;
+
+    if (hasLocationUpdate) {
+      const countryCode =
+        payload.countryCode?.trim() ?? existing.countryCode ?? undefined;
+      const city = payload.city?.trim() ?? existing.city ?? undefined;
+
+      if (!countryCode || !city) {
+        return this.HandleError(
+          new BadRequestException(
+            'Both countryCode and city are required when updating location (send both, or set them together).',
+          ),
+        );
+      }
+
+      const localeData = buildUserLocaleUpdate({
+        countryCode,
+        city,
+        locale: payload.locale,
+      });
+
+      if (!localeData?.timezone) {
+        return this.HandleError(
+          new BadRequestException(
+            'Could not determine timezone from country and city. Use a recognized city for that country.',
+          ),
+        );
+      }
+
+      const data: Record<string, unknown> = {
+        ...(payload.name !== undefined && { name: payload.name }),
+        ...(payload.username !== undefined && { username: payload.username }),
+        ...localeData,
+      };
+
+      if (payload.ttsVoicePreference !== undefined) {
+        const enumValue = TTS_PERSONA_NAME_TO_ENUM[payload.ttsVoicePreference];
+        if (!enumValue) {
+          return this.HandleError(
+            new BadRequestException(
+              `Invalid persona name: ${payload.ttsVoicePreference}`,
+            ),
+          );
+        }
+        data.ttsVoicePreference = enumValue;
+      }
+
+      try {
+        const updatedUser = await this.prisma.user.update({
+          where: { firebaseId },
+          data,
+        });
+        return this.Results(this.enrichUserWithPersonaDetails(updatedUser));
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'P2025') {
+          return this.HandleError(new NotFoundException('User not found'));
+        }
+        throw error;
+      }
+    }
+
+    const data: Record<string, unknown> = {};
+    if (payload.name !== undefined) data.name = payload.name;
+    if (payload.username !== undefined) data.username = payload.username;
+    if (payload.locale !== undefined) data.locale = payload.locale;
+
+    if (payload.ttsVoicePreference !== undefined) {
+      const enumValue = TTS_PERSONA_NAME_TO_ENUM[payload.ttsVoicePreference];
+      if (!enumValue) {
+        return this.HandleError(
+          new BadRequestException(
+            `Invalid persona name: ${payload.ttsVoicePreference}`,
+          ),
+        );
+      }
+      data.ttsVoicePreference = enumValue;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.HandleError(
+        new BadRequestException('At least one field is required to update'),
+      );
+    }
+
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { firebaseId },
+        data,
+      });
+      return this.Results(this.enrichUserWithPersonaDetails(updatedUser));
+    } catch (error) {
+      if ((error as { code?: string })?.code === 'P2025') {
+        return this.HandleError(new NotFoundException('User not found'));
+      }
+      throw error;
+    }
   }
 
   async changeName(firebaseId: string, payload: ChangeNameDto) {

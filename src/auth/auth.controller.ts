@@ -10,7 +10,7 @@ import {
   ChangePasswordDto,
   VerifyPasswordResetOtpDto,
   GoogleSignInDto,
-  AppleSignInDto
+  AppleSignInDto,
 } from './dto';
 import { BaseController, AuthGuard, FirebaseUser } from 'src/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';

@@ -394,6 +394,47 @@ export class SupabaseStorageService {
     }
 
     /**
+     * Upload a buffer to an explicit storage path.
+     */
+    async uploadBufferAtPath(
+        buffer: Buffer,
+        filePath: string,
+        contentType: string,
+    ): Promise<UploadResult> {
+        this.ensureInitialized();
+
+        try {
+            const { error } = await this.supabase!.storage
+                .from(this.bucketName!)
+                .upload(filePath, buffer, {
+                    contentType,
+                    upsert: true,
+                });
+
+            if (error) {
+                throw new BadRequestException(`Failed to upload file: ${error.message}`);
+            }
+
+            const signedUrl = await this.getSignedUrl(filePath, 3600);
+
+            return {
+                url: signedUrl,
+                path: filePath,
+                fileName: filePath.split('/').pop() ?? filePath,
+                contentType,
+                size: buffer.length,
+            };
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            throw new BadRequestException(
+                `Failed to upload file: ${error.message}`,
+            );
+        }
+    }
+
+    /**
      * Get a signed URL for a file (for private buckets)
      */
     async getSignedUrl(filePath: string, expiresIn: number = 3600): Promise<string> {

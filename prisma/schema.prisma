@@ -34,6 +34,15 @@ model User {
   streakReminderEnabled Boolean             @default(true)
   streakReminderTimes   String[]            @default([])
   timezone              String              @default("UTC")
+  locale                String?
+  countryCode           String?
+  region                String?
+  city                  String?
+  locationUpdatedAt     DateTime?
+  loopTokensRemaining   Int                 @default(5)
+  loopReminderEnabled   Boolean             @default(false)
+  loopReminderMorning   String?
+  loopReminderEvening   String?
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
   wheelOfLife           WheelOfLife?
@@ -41,6 +50,7 @@ model User {
   visionBoards          VisionBoard[]
   journals              Journal[]
   streakHistory         StreakHistory[]
+  affirmationLoops      AffirmationLoop[]
 }
 
 model StreakHistory {
@@ -266,20 +276,51 @@ model Wave {
 }
 
 model Affirmation {
-  id                 String              @id @default(uuid())
+  id                 String                @id @default(uuid())
   sessionId          String
-  session            ReflectionSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session            ReflectionSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   affirmationText    String
   audioUrl           String?
-  isSelected         Boolean             @default(false)
-  order              Int                 @default(0)
+  isSelected         Boolean               @default(false)
+  order              Int                   @default(0)
   ttsVoicePreference TtsVoicePreference?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  loopItems          AffirmationLoopItem[]
 
   @@index([sessionId])
   @@index([sessionId, isSelected])
   @@index([sessionId, order])
+}
+
+model AffirmationLoop {
+  id                 String                @id @default(uuid())
+  userId             String
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status             AffirmationLoopStatus @default(PROCESSING)
+  audioPath          String?
+  durationSeconds    Int?
+  backgroundMusicKey String
+  voicePreference    TtsVoicePreference?
+  errorMessage       String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  items              AffirmationLoopItem[]
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+}
+
+model AffirmationLoopItem {
+  loopId        String
+  affirmationId String
+  sortOrder     Int
+  loop          AffirmationLoop @relation(fields: [loopId], references: [id], onDelete: Cascade)
+  affirmation   Affirmation     @relation(fields: [affirmationId], references: [id], onDelete: Cascade)
+
+  @@id([loopId, affirmationId])
+  @@unique([loopId, sortOrder])
+  @@index([affirmationId])
 }
 
 model VisionBoard {
@@ -377,6 +418,13 @@ enum ReflectionSessionStatus {
   BELIEF_CAPTURED
   AFFIRMATION_GENERATED
   COMPLETED
+}
+
+enum AffirmationLoopStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
 }
 
 enum TtsVoicePreference {

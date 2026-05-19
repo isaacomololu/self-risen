@@ -1,0 +1,46 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, Length } from 'class-validator';
+
+export class UpdateUserDto {
+    @ApiPropertyOptional({ example: 'Jane Doe' })
+    @IsOptional()
+    @IsString()
+    name?: string;
+
+    @ApiPropertyOptional({ example: 'jane_risen' })
+    @IsOptional()
+    @IsString()
+    username?: string;
+
+    @ApiPropertyOptional({ example: 'en-US' })
+    @IsOptional()
+    @IsString()
+    locale?: string;
+
+    @ApiPropertyOptional({
+        description: 'ISO 3166-1 alpha-2 country code (send with city to update location)',
+        example: 'US',
+    })
+    @IsOptional()
+    @IsString()
+    @Length(2, 2, { message: 'countryCode must be a 2-letter ISO code' })
+    countryCode?: string;
+
+    @ApiPropertyOptional({
+        description: 'City name; timezone is derived server-side with countryCode',
+        example: 'Chicago',
+    })
+    @IsOptional()
+    @IsString()
+    city?: string;
+
+    @ApiPropertyOptional({
+        enum: ['Sage', 'Phoenix', 'River', 'Quinn', 'Alex', 'Robin'],
+        description: 'Default TTS voice persona',
+        example: 'Sage',
+    })
+    @IsOptional()
+    @IsString()
+    @IsIn(['Sage', 'Phoenix', 'River', 'Quinn', 'Alex', 'Robin'])
+    ttsVoicePreference?: string;
+}

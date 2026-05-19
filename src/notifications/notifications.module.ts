@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -18,6 +18,7 @@ import { INotificationService } from './interfaces/notification.interface';
 import { NotificationChannelTypeEnum } from './enums/notification.enum';
 import { IEmailChannelAdapter } from './interfaces/adapter.interface';
 
+@Global()
 @Module({
   imports: [
     ConfigModule,
@@ -39,18 +40,32 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
       },
       inject: [ConfigService],
     }),
-    BullModule.registerQueue({
-      name: 'notification_dispatch',
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
+    BullModule.registerQueue(
+      {
+        name: 'notification_dispatch',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
         },
-        removeOnComplete: true,
-        removeOnFail: false,
       },
-    }),
+      {
+        name: 'audio_merge',
+        defaultJobOptions: {
+          attempts: 2,
+          backoff: {
+            type: 'exponential',
+            delay: 10000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      },
+    ),
     CacheModule.register(),
   ],
   controllers: [NotificationsController],
@@ -135,6 +150,6 @@ import { IEmailChannelAdapter } from './interfaces/adapter.interface';
       ],
     },
   ],
-  exports: [INotificationService, NotificationsService],
+  exports: [BullModule, INotificationService, NotificationsService],
 })
 export class NotificationsModule { }
