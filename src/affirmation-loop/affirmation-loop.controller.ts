@@ -12,16 +12,25 @@ import {
 } from '@nestjs/common';
 import {
     ApiBearerAuth,
+    ApiBody,
     ApiOperation,
     ApiParam,
     ApiQuery,
+    ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
 import { FirebaseGuard } from '@alpha018/nestjs-firebase-auth';
 import { auth } from 'firebase-admin';
 import { BaseController, FirebaseUser, StreakInterceptor } from 'src/common';
 import { AffirmationLoopService } from './affirmation-loop.service';
-import { CreateAffirmationLoopDto, UpdateLoopRemindersDto } from './dto';
+import {
+    AffirmationLoopListResponseDto,
+    AffirmationLoopResponseDto,
+    CreateAffirmationLoopDto,
+    DeleteAffirmationLoopResponseDto,
+    LoopRemindersResponseDto,
+    UpdateLoopRemindersDto,
+} from './dto';
 
 @UseGuards(FirebaseGuard)
 @UseInterceptors(StreakInterceptor)
@@ -34,7 +43,23 @@ export class AffirmationLoopController extends BaseController {
     }
 
     @Post()
-    @ApiOperation({ summary: 'Generate affirmation audio loop' })
+    @ApiOperation({
+        summary: 'Create affirmation audio loop',
+        description:
+            'Merges the given affirmations with background music into a single MP3. Debits one loop token, enqueues a background merge job, and returns immediately with status PROCESSING. Poll GET /reflection/loops/:id until status is READY (audioUrl available) or FAILED (errorMessage, token refunded).',
+    })
+    @ApiBody({ type: CreateAffirmationLoopDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Loop created and merge job enqueued',
+        type: AffirmationLoopResponseDto,
+    })
+    @ApiResponse({
+        status: 400,
+        description:
+            'No loop tokens remaining, invalid background music key, affirmations not owned, empty affirmation text, or duplicate affirmation IDs',
+    })
+    @ApiResponse({ status: 404, description: 'User not found' })
     async createLoop(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Body() dto: CreateAffirmationLoopDto,
@@ -49,9 +74,31 @@ export class AffirmationLoopController extends BaseController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'List affirmation loops for the current user' })
-    @ApiQuery({ name: 'page', required: false, type: Number })
-    @ApiQuery({ name: 'limit', required: false, type: Number })
+    @ApiOperation({
+        summary: 'List affirmation loops',
+        description:
+            'Returns a paginated list of affirmation loops for the current user, newest first. audioUrl is included only for loops with status READY.',
+    })
+    @ApiQuery({
+        name: 'page',
+        required: false,
+        type: Number,
+        description: 'Page number (default: 1)',
+        example: 1,
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        type: Number,
+        description: 'Items per page (default: 10, max: 100)',
+        example: 10,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmation loops retrieved successfully',
+        type: AffirmationLoopListResponseDto,
+    })
+    @ApiResponse({ status: 404, description: 'User not found' })
     async listLoops(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Query('page') page?: number,
@@ -71,7 +118,18 @@ export class AffirmationLoopController extends BaseController {
     }
 
     @Patch('reminders')
-    @ApiOperation({ summary: 'Update morning/evening loop reminder times' })
+    @ApiOperation({
+        summary: 'Update loop reminder schedule',
+        description:
+            'Updates morning/evening affirmation loop reminder times for the current user. Times are HH:mm (24-hour) in the user\'s timezone.',
+    })
+    @ApiBody({ type: UpdateLoopRemindersDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Loop reminders updated successfully',
+        type: LoopRemindersResponseDto,
+    })
+    @ApiResponse({ status: 404, description: 'User not found' })
     async updateReminders(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Body() dto: UpdateLoopRemindersDto,
@@ -89,8 +147,22 @@ export class AffirmationLoopController extends BaseController {
     }
 
     @Get(':id')
-    @ApiOperation({ summary: 'Get affirmation loop by ID (poll status)' })
-    @ApiParam({ name: 'id', description: 'Loop ID' })
+    @ApiOperation({
+        summary: 'Get affirmation loop by ID',
+        description:
+            'Retrieves a single loop. Use to poll merge progress after POST: status PROCESSING until READY (signed audioUrl, durationSeconds) or FAILED (errorMessage).',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Affirmation loop ID',
+        example: '22c31e61-2308-4a3a-a36a-3cff5947cb74',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmation loop retrieved successfully',
+        type: AffirmationLoopResponseDto,
+    })
+    @ApiResponse({ status: 404, description: 'User or affirmation loop not found' })
     async getLoop(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('id') id: string,
@@ -105,8 +177,22 @@ export class AffirmationLoopController extends BaseController {
     }
 
     @Delete(':id')
-    @ApiOperation({ summary: 'Delete an affirmation loop' })
-    @ApiParam({ name: 'id', description: 'Loop ID' })
+    @ApiOperation({
+        summary: 'Delete affirmation loop',
+        description:
+            'Deletes the loop record and removes the merged MP3 from storage when present.',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Affirmation loop ID',
+        example: '22c31e61-2308-4a3a-a36a-3cff5947cb74',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Affirmation loop deleted successfully',
+        type: DeleteAffirmationLoopResponseDto,
+    })
+    @ApiResponse({ status: 404, description: 'User or affirmation loop not found' })
     async deleteLoop(
         @FirebaseUser() user: auth.DecodedIdToken,
         @Param('id') id: string,

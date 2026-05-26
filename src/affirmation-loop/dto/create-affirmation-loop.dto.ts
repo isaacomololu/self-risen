@@ -15,7 +15,8 @@ export class CreateAffirmationLoopDto {
     affirmationIds: string[];
 
     @ApiProperty({
-        description: 'Background music key from stater-videos music list',
+        description:
+            'Background music name from GET /stater-videos/music (must match a list item name exactly)',
         example: 'meditation',
     })
     @IsString()
@@ -23,9 +24,10 @@ export class CreateAffirmationLoopDto {
     backgroundMusicKey: string;
 
     @ApiProperty({
-        description: 'Optional voice persona name or enum for affirmations missing audio or with a different voice',
+        description:
+            'Optional TTS voice for affirmations missing audio or with a different voice. Accepts a persona name (e.g. Sage) or TtsVoicePreference enum value.',
         required: false,
-        example: 'Sage',
+        example: 'FEMALE_EMPATHETIC',
     })
     @IsOptional()
     @IsString()
