@@ -16,6 +16,64 @@ interface CityTimezoneMatch {
     pop?: number;
 }
 
+function normalizeCityName(city: string): string {
+    return city
+        .trim()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .replace(/\s+/g, ' ');
+}
+
+function lookupCityTimezone(
+    iso2: string,
+    cityName: string,
+): string | null {
+    let matches: CityTimezoneMatch[] =
+        cityTimezones.lookupViaCity(cityName) ?? [];
+    matches = matches.filter((m) => m.iso2?.toUpperCase() === iso2);
+
+    if (matches.length >= 1) {
+        if (matches.length > 1) {
+            matches.sort((a, b) => (b.pop ?? 0) - (a.pop ?? 0));
+        }
+        return matches[0].timezone ?? null;
+    }
+
+    const normalized = normalizeCityName(cityName);
+    if (normalized !== cityName) {
+        return lookupCityTimezone(iso2, normalized);
+    }
+
+    return null;
+}
+
+/**
+ * When a city is missing from the dataset, use the most populous known
+ * city's timezone for that country (e.g. Mexico City for MX).
+ */
+function getPrimaryTimezoneForCountry(iso2: string): string | null {
+    const country = ct.getCountry(iso2);
+    const zones = country?.timezones ?? [];
+    if (zones.length === 0) {
+        return null;
+    }
+    if (zones.length === 1) {
+        return zones[0];
+    }
+
+    const countryCities = (cityTimezones.findFromIsoCode(iso2) ??
+        []) as CityTimezoneMatch[];
+    if (countryCities.length > 0) {
+        countryCities.sort((a, b) => (b.pop ?? 0) - (a.pop ?? 0));
+        const primaryTimezone = countryCities[0].timezone;
+        if (primaryTimezone && (zones as string[]).includes(primaryTimezone)) {
+            return primaryTimezone;
+        }
+    }
+
+    return zones[0] ?? null;
+}
+
 /**
  * Resolve IANA timezone from ISO country code + city.
  */
@@ -29,23 +87,12 @@ export function resolveTimezoneFromLocation(
         return null;
     }
 
-    let matches: CityTimezoneMatch[] = cityTimezones.lookupViaCity(cityName) ?? [];
-    matches = matches.filter((m) => m.iso2?.toUpperCase() === iso2);
-
-    if (matches.length >= 1) {
-        if (matches.length > 1) {
-            matches.sort((a, b) => (b.pop ?? 0) - (a.pop ?? 0));
-        }
-        return matches[0].timezone ?? null;
+    const exactMatch = lookupCityTimezone(iso2, cityName);
+    if (exactMatch) {
+        return exactMatch;
     }
 
-    const country = ct.getCountry(iso2);
-    const zones = country?.timezones ?? [];
-    if (zones.length === 1) {
-        return zones[0];
-    }
-
-    return null;
+    return getPrimaryTimezoneForCountry(iso2);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { config, setupConfig } from './common';
 import * as dotenv from 'dotenv';
@@ -55,7 +55,20 @@ async function bootstrap() {
       }
     );
 
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        exceptionFactory: (errors) => {
+          const messages = errors.flatMap((error) =>
+            Object.values(error.constraints ?? {}),
+          );
+          return new BadRequestException(
+            messages.join(' ') || 'Invalid request data.',
+          );
+        },
+      }),
+    );
 
     await app.listen(process.env.PORT ?? 8080);
 

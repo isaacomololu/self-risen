@@ -17,10 +17,16 @@ describe('user-locale.util', () => {
             );
         });
 
-        it('returns null for unknown city in multi-timezone country', () => {
+        it('falls back to the primary timezone for unknown cities in multi-timezone countries', () => {
             expect(
                 resolveTimezoneFromLocation('US', 'NonexistentCityXYZ123'),
-            ).toBeNull();
+            ).toBe('America/New_York');
+        });
+
+        it('resolves Valle de Bravo, Mexico via country primary timezone fallback', () => {
+            expect(resolveTimezoneFromLocation('MX', 'Valle de Bravo')).toBe(
+                'America/Mexico_City',
+            );
         });
     });
 

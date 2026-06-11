@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -69,12 +70,21 @@ export class AuthService extends BaseService {
     }
 
     try {
-      const localeData = buildUserLocaleUpdate(payload) ?? {};
+      const localeData = buildUserLocaleUpdate(payload);
+
+      if (!localeData?.countryCode || !localeData?.city) {
+        return this.HandleError(
+          new BadRequestException('Country and city are required to create an account.'),
+        );
+      }
 
       if (!localeData.timezone) {
+        logger.warn(
+          `Timezone resolution failed for signup: country=${localeData.countryCode}, city=${localeData.city}`,
+        );
         return this.HandleError(
-          new ConflictException(
-            'Could not determine timezone from country and city. Use a recognized city name for the given country.',
+          new BadRequestException(
+            `We could not determine a timezone for "${localeData.city}" in ${localeData.countryCode}. Please check the city name and country code, then try again.`,
           ),
         );
       }

@@ -151,9 +151,12 @@ export class UserService extends BaseService {
       });
 
       if (!localeData?.timezone) {
+        this.logger.warn(
+          `Timezone resolution failed for user update: country=${countryCode}, city=${city}`,
+        );
         return this.HandleError(
           new BadRequestException(
-            'Could not determine timezone from country and city. Use a recognized city for that country.',
+            `We could not determine a timezone for "${city}" in ${countryCode}. Please check the city name and country code, then try again.`,
           ),
         );
       }
