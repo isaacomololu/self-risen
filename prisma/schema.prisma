@@ -300,6 +300,8 @@ model AffirmationLoop {
   backgroundMusicKey String
   voicePreference    TtsVoicePreference?
   errorMessage       String?
+  name               String?
+  description        String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   items              AffirmationLoopItem[]

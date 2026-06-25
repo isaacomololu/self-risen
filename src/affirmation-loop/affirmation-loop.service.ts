@@ -12,7 +12,7 @@ import { DatabaseProvider } from 'src/database/database.provider';
 import { StorageService } from 'src/common/storage/storage.service';
 import { StaterVideosService } from 'src/stater-videos/stater-videos.service';
 import { TextToSpeechService } from 'src/reflection/services/text-to-speech.service';
-import { CreateAffirmationLoopDto, UpdateLoopRemindersDto } from './dto';
+import { CreateAffirmationLoopDto, UpdateAffirmationLoopDto, UpdateLoopRemindersDto } from './dto';
 import { DEFAULT_LOOP_REMINDER_TIMES } from './loop-reminder.constants';
 
 export interface AudioMergeJobData {
@@ -106,6 +106,8 @@ export class AffirmationLoopService extends BaseService {
                     durationSeconds: dto.durationSeconds,
                     backgroundMusicKey: dto.backgroundMusicKey,
                     voicePreference: voicePreference ?? undefined,
+                    name: dto.name ?? null,
+                    description: dto.description ?? null,
                     items: {
                         create: dto.affirmationIds.map((affirmationId, sortOrder) => ({
                             affirmationId,
@@ -126,6 +128,33 @@ export class AffirmationLoopService extends BaseService {
         this.logger.log(`Enqueued audio merge for loop ${loop.id}`);
 
         return this.Results(this.toResponse(loop, null));
+    }
+
+    async updateLoop(firebaseId: string, loopId: string, dto: UpdateAffirmationLoopDto) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+        
+        const loop = await this.prisma.affirmationLoop.findUnique({
+            where: { id: loopId, userId: user.id },
+        });
+
+        if (!loop) {
+            return this.HandleError(new NotFoundException('Affirmation loop not found'));
+        }
+
+        const updated = await this.prisma.affirmationLoop.update({
+            where: { id: loopId },
+            data: {
+                name: dto.name,
+                description: dto.description,
+                backgroundMusicKey: dto.backgroundMusicKey,
+                durationSeconds: dto.durationSeconds,
+            },
+        });
+        
+        return this.Results(updated);
     }
 
     async getLoopById(firebaseId: string, loopId: string) {

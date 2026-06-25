@@ -5,3 +5,4 @@ export { AffirmationLoopListResponseDto } from './affirmation-loop-list-response
 export { LoopRemindersResponseDto } from './loop-reminders-response.dto';
 export { DeleteAffirmationLoopResponseDto } from './delete-affirmation-loop-response.dto';
 export { PaginationMetaDto } from './pagination-meta.dto';
+export { UpdateAffirmationLoopDto } from './update-affirmation-loop.dto';

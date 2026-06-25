@@ -47,6 +47,22 @@ export class CreateAffirmationLoopDto {
     durationSeconds: number;
 
     @ApiProperty({
+        description: 'Loop name',
+        example: 'My Loop',
+    })
+    @IsString()
+    @IsOptional()
+    name?: string;
+
+    @ApiProperty({
+        description: 'Loop description',
+        example: 'This is a loop description',
+    })
+    @IsString()
+    @IsOptional()
+    description?: string;
+
+    @ApiProperty({
         description:
             'Optional TTS voice persona for affirmations missing audio or with a different voice. Accepts a persona name (e.g. Sage).',
         required: false,
