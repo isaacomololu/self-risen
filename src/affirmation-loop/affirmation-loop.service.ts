@@ -1,5 +1,7 @@
 import {
     BadRequestException,
+    HttpException,
+    HttpStatus,
     Injectable,
     Logger,
     NotFoundException,
@@ -42,7 +44,7 @@ export class AffirmationLoopService extends BaseService {
 
         if (user.loopTokensRemaining <= 0) {
             return this.HandleError(
-                new BadRequestException('No loop tokens remaining'),
+                new HttpException('No loop tokens remaining', HttpStatus.PAYMENT_REQUIRED),
             );
         }
 
@@ -93,11 +95,13 @@ export class AffirmationLoopService extends BaseService {
             }
         }
 
+        let tokensRemaining = user.loopTokensRemaining;
         const loop = await this.prisma.$transaction(async (tx) => {
-            await tx.user.update({
+            const updatedUser = await tx.user.update({
                 where: { id: user.id },
                 data: { loopTokensRemaining: { decrement: 1 } },
             });
+            tokensRemaining = updatedUser.loopTokensRemaining;
 
             const created = await tx.affirmationLoop.create({
                 data: {
@@ -127,7 +131,22 @@ export class AffirmationLoopService extends BaseService {
 
         this.logger.log(`Enqueued audio merge for loop ${loop.id}`);
 
-        return this.Results(this.toResponse(loop, null));
+        return this.Results({
+            ...this.toResponse(loop, null),
+            tokensRemaining,
+        });
+    }
+
+    async getTokenBalance(firebaseId: string) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        return this.Results({
+            tokensRemaining: user.loopTokensRemaining,
+            resetAt: user.loopTokensResetAt,
+        });
     }
 
     async updateLoop(firebaseId: string, loopId: string, dto: UpdateAffirmationLoopDto) {

@@ -38,6 +38,7 @@ model User {
   region                String?
   locationUpdatedAt     DateTime?
   loopTokensRemaining   Int                 @default(5)
+  loopTokensResetAt     DateTime?
   loopReminderEnabled   Boolean             @default(false)
   loopReminderTimes     String[]            @default([])
   createdAt             DateTime            @default(now())

@@ -3,6 +3,8 @@ import {
     Controller,
     Delete,
     Get,
+    HttpCode,
+    HttpStatus,
     Param,
     Patch,
     Post,
@@ -44,6 +46,7 @@ export class AffirmationLoopController extends BaseController {
     }
 
     @Post()
+    @HttpCode(HttpStatus.ACCEPTED)
     @ApiOperation({
         summary: 'Create affirmation audio loop',
         description:
@@ -51,15 +54,16 @@ export class AffirmationLoopController extends BaseController {
     })
     @ApiBody({ type: CreateAffirmationLoopDto })
     @ApiResponse({
-        status: 200,
+        status: 202,
         description: 'Loop created and merge job enqueued',
         type: AffirmationLoopResponseDto,
     })
     @ApiResponse({
         status: 400,
         description:
-            'No loop tokens remaining, invalid background music key, affirmations not owned, empty affirmation text, or duplicate affirmation IDs',
+            'Invalid background music key, affirmations not owned, empty affirmation text, or duplicate affirmation IDs',
     })
+    @ApiResponse({ status: 402, description: 'No loop tokens remaining' })
     @ApiResponse({ status: 404, description: 'User not found' })
     async createLoop(
         @FirebaseUser() user: auth.DecodedIdToken,
@@ -183,6 +187,24 @@ export class AffirmationLoopController extends BaseController {
 
         return this.response({
             message: 'Loop reminders updated',
+            data: result.data,
+        });
+    }
+
+    @Get('tokens')
+    @ApiOperation({
+        summary: 'Get remaining loop token balance',
+        description:
+            'Returns the number of loop generations the user has left this month, and when the allowance last reset.',
+    })
+    @ApiResponse({ status: 200, description: 'Token balance retrieved' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    async getTokenBalance(@FirebaseUser() user: auth.DecodedIdToken) {
+        const result = await this.affirmationLoopService.getTokenBalance(user.uid);
+        if (result.isError) throw result.error;
+
+        return this.response({
+            message: 'Loop token balance retrieved',
             data: result.data,
         });
     }
