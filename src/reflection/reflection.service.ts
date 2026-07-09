@@ -162,6 +162,10 @@ export class ReflectionService extends BaseService {
                         mimeType: true,
                     },
                 },
+                waves: {
+                    where: { isActive: true },
+                    select: { id: true, startDate: true, endDate: true, durationDays: true },
+                },
             },
         });
 
@@ -887,6 +891,56 @@ export class ReflectionService extends BaseService {
         });
 
         return this.Results(updatedSession);
+    }
+
+    /**
+     * List all waves for the current user across sessions, newest first.
+     */
+    async getAllWaves(firebaseId: string, page: number = 1, limit: number = 10) {
+        const user = await this.getUserByFirebaseId(firebaseId);
+        if (!user) {
+            return this.HandleError(new NotFoundException('User not found'));
+        }
+
+        const pageNumber = Math.max(1, Math.floor(page));
+        const pageSize = Math.max(1, Math.min(100, Math.floor(limit)));
+        const skip = (pageNumber - 1) * pageSize;
+
+        const whereClause = { session: { userId: user.id } };
+
+        const [totalCount, waves] = await Promise.all([
+            this.prisma.wave.count({ where: whereClause }),
+            this.prisma.wave.findMany({
+                where: whereClause,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: pageSize,
+                include: {
+                    session: {
+                        select: {
+                            id: true,
+                            selectedAffirmationText: true,
+                            selectedAffirmationAudioUrl: true,
+                            category: { select: { id: true, name: true } },
+                        },
+                    },
+                },
+            }),
+        ]);
+
+        const totalPages = Math.ceil(totalCount / pageSize);
+
+        return this.Results({
+            data: waves,
+            pagination: {
+                page: pageNumber,
+                limit: pageSize,
+                total: totalCount,
+                totalPages,
+                hasNextPage: pageNumber < totalPages,
+                hasPreviousPage: pageNumber > 1,
+            },
+        });
     }
 
     /**
