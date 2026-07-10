@@ -34,6 +34,7 @@ export interface OmniCbtResponse {
     detectedDistortion: string | null;
     primaryEmotion: string;
     supportType: OmniCbtSupportType;
+    userContext: string;
     reflectiveSummary: string;
     generatedAffirmation: string | null;
     socraticPivot: string | null;

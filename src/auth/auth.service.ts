@@ -19,6 +19,7 @@ import {
   VerifyPasswordResetOtpDto,
   GoogleSignInDto,
   AppleSignInDto,
+  FacebookSignInDto,
 } from './dto';
 import { buildUserLocaleUpdate } from './utils/user-locale.util';
 import { auth } from 'firebase-admin';
@@ -300,6 +301,103 @@ export class AuthService extends BaseService {
       logger.error(`Google sign-in error: ${error.message || error}`);
       return this.HandleError(
         new UnauthorizedException('Google sign-in failed. Please try again.')
+      );
+    }
+  }
+
+  async signInWithFacebook(payload: FacebookSignInDto) {
+    const { accessToken } = payload;
+
+    try {
+      // Verify Facebook access token and fetch profile via Graph API
+      const graphResponse = await fetch(
+        `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`
+      );
+
+      if (!graphResponse.ok) {
+        logger.error(`Facebook token verification failed: ${graphResponse.statusText}`);
+        return this.HandleError(
+          new UnauthorizedException('Invalid Facebook access token')
+        );
+      }
+
+      const profile = await graphResponse.json();
+
+      // Validate profile info
+      if (!profile.id) {
+        logger.error(`Invalid Facebook profile: ${JSON.stringify(profile)}`);
+        return this.HandleError(
+          new UnauthorizedException('Invalid Facebook token information')
+        );
+      }
+
+      // Email is required for user creation
+      const email = profile.email;
+      if (!email) {
+        logger.error(`Facebook profile missing email: ${JSON.stringify(profile)}`);
+        return this.HandleError(
+          new UnauthorizedException('Email is required for Facebook sign-in')
+        );
+      }
+
+      const name = profile.name || email.split('@')[0];
+      const picture = profile.picture?.data?.url || null;
+
+      // Check if user exists in database by email
+      let user = await this.prisma.user.findUnique({
+        where: { email }
+      });
+
+      let firebaseUid: string;
+      try {
+        const result = await this.createOrGetOAuthUser({
+          email,
+          name,
+          existingUser: user,
+          avatar: picture,
+        });
+        user = result.user;
+        firebaseUid = result.firebaseUid;
+      } catch (error) {
+        return this.HandleError(error);
+      }
+
+      // Generate Firebase tokens for API authentication
+      const customToken = await auth().createCustomToken(firebaseUid);
+
+      // Exchange custom token for ID token and refresh token
+      const firebaseWebApiKey = config.FIREBASE_API_KEY;
+      const tokenResponse = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseWebApiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token: customToken,
+            returnSecureToken: true,
+          }),
+        }
+      );
+
+      const tokenData = await tokenResponse.json();
+
+      if (!tokenResponse.ok) {
+        logger.error(`Failed to exchange custom token: ${JSON.stringify(tokenData)}`);
+        return this.HandleError(
+          new UnauthorizedException('Failed to generate authentication tokens')
+        );
+      }
+
+      return this.Results({
+        accessToken: tokenData.idToken,
+        refreshToken: tokenData.refreshToken,
+      });
+    } catch (error) {
+      logger.error(`Facebook sign-in error: ${error.message || error}`);
+      return this.HandleError(
+        new UnauthorizedException('Facebook sign-in failed. Please try again.')
       );
     }
   }

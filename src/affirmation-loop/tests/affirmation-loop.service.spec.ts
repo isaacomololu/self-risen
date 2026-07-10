@@ -11,7 +11,7 @@ jest.mock('src/common', () => ({
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, NotFoundException } from '@nestjs/common';
 import { AffirmationLoopStatus } from '@prisma/client';
 import { AffirmationLoopService } from '../affirmation-loop.service';
 import { DatabaseProvider } from 'src/database/database.provider';
@@ -51,9 +51,6 @@ describe('AffirmationLoopService', () => {
                         affirmationText: 'I am capable',
                     },
                 ]),
-            },
-            reflectionSession: {
-                findMany: jest.fn().mockResolvedValue([]),
             },
             $transaction: jest.fn(async (fn: (tx: any) => Promise<unknown>) => {
                 const tx = {
@@ -112,7 +109,8 @@ describe('AffirmationLoopService', () => {
         });
 
         expect(result.isError).toBe(true);
-        expect(result.error).toBeInstanceOf(BadRequestException);
+        expect(result.error).toBeInstanceOf(HttpException);
+        expect((result.error as HttpException).getStatus()).toBe(402);
         expect(mockQueue.add).not.toHaveBeenCalled();
     });
 
@@ -129,76 +127,18 @@ describe('AffirmationLoopService', () => {
         expect(result.error).toBeInstanceOf(BadRequestException);
     });
 
-    it('should resolve reflection session IDs to selected affirmations', async () => {
-        mockPrisma.affirmation.findMany.mockResolvedValue([
-            {
-                id: 'aff-1',
-                affirmationText: 'First affirmation',
-            },
-        ]);
-        mockPrisma.reflectionSession.findMany.mockResolvedValue([
-            {
-                id: 'session-2',
-                selectedAffirmationText: 'Second affirmation',
-                affirmations: [
-                    {
-                        id: 'aff-2',
-                        affirmationText: 'Second affirmation',
-                        isSelected: true,
-                    },
-                ],
-            },
-        ]);
+    it('should reject affirmations not owned by user', async () => {
+        mockPrisma.affirmation.findMany.mockResolvedValue([]);
 
         const result = await service.createLoop('fb-1', {
-            affirmationIds: ['aff-1', 'session-2'],
+            affirmationIds: ['aff-missing'],
             backgroundMusicKey: 'meditation',
             durationSeconds: 180,
         });
 
-        expect(result.isError).toBe(false);
-        expect(mockPrisma.$transaction).toHaveBeenCalled();
-        const txFn = mockPrisma.$transaction.mock.calls[0][0];
-        const tx = {
-            user: {
-                update: jest.fn().mockResolvedValue({ ...mockUser, loopTokensRemaining: 4 }),
-            },
-            affirmationLoop: {
-                create: jest.fn().mockImplementation(({ data }) =>
-                    Promise.resolve({
-                        id: 'loop-1',
-                        status: AffirmationLoopStatus.PROCESSING,
-                        audioPath: null,
-                        durationSeconds: data.durationSeconds,
-                        backgroundMusicKey: 'meditation',
-                        voicePreference: null,
-                        errorMessage: null,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                        items: data.items.create.map(
-                            (item: { affirmationId: string; sortOrder: number }) => ({
-                                affirmationId: item.affirmationId,
-                                sortOrder: item.sortOrder,
-                            }),
-                        ),
-                    }),
-                ),
-            },
-        };
-        await txFn(tx);
-        expect(tx.affirmationLoop.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    durationSeconds: 180,
-                    items: {
-                        create: [
-                            { affirmationId: 'aff-1', sortOrder: 0 },
-                            { affirmationId: 'aff-2', sortOrder: 1 },
-                        ],
-                    },
-                }),
-            }),
-        );
+        expect(result.isError).toBe(true);
+        expect(result.error).toBeInstanceOf(BadRequestException);
+        expect(mockQueue.add).not.toHaveBeenCalled();
     });
 
     it('should debit token, create loop, and enqueue job', async () => {

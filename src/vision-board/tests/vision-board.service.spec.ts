@@ -3,6 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { VisionBoardService } from '../vision-board.service';
 import { DatabaseProvider } from '../../database/database.provider';
 import { StorageService, FileType } from '../../common/storage/storage.service';
+import { StaterVideosService } from '../../stater-videos/stater-videos.service';
 import { ReflectionSessionStatus } from '@prisma/client';
 
 jest.mock('../../common', () => {
@@ -21,6 +22,7 @@ describe('VisionBoardService', () => {
   let service: VisionBoardService;
   let mockPrisma: any;
   let mockStorageService: any;
+  let mockStaterVideosService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -101,6 +103,7 @@ describe('VisionBoardService', () => {
       },
       reflectionSession: {
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
       visionSound: {
         create: jest.fn(),
@@ -109,6 +112,9 @@ describe('VisionBoardService', () => {
         findMany: jest.fn(),
         update: jest.fn(),
       },
+      // The service wraps writes in $transaction; run the callback with the
+      // same mocked client so tx.* calls resolve to these jest mocks.
+      $transaction: jest.fn((cb) => cb(mockPrisma)),
     };
 
     mockStorageService = {
@@ -116,11 +122,16 @@ describe('VisionBoardService', () => {
       deleteFile: jest.fn(),
     };
 
+    mockStaterVideosService = {
+      getSoundByName: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VisionBoardService,
         { provide: DatabaseProvider, useValue: mockPrisma },
         { provide: StorageService, useValue: mockStorageService },
+        { provide: StaterVideosService, useValue: mockStaterVideosService },
       ],
     }).compile();
 
@@ -275,7 +286,8 @@ describe('VisionBoardService', () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.visionBoard.findFirst.mockResolvedValue(mockVisionBoard);
       mockPrisma.reflectionSession.findFirst.mockResolvedValue(mockReflectionSession);
-      mockPrisma.vision.findUnique.mockResolvedValue(mockVision);
+      // Existing-vision duplicate check uses vision.findFirst.
+      mockPrisma.vision.findFirst.mockResolvedValue(mockVision);
 
       const result = await service.addVision('firebase-uid-123', 'vision-board-123', 'session-123');
 
@@ -494,9 +506,12 @@ describe('VisionBoardService', () => {
 
     it('should return error when reflection session is already linked to another vision', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.vision.findFirst.mockResolvedValue(mockVision);
+      // First findFirst loads the vision being updated; second is the
+      // duplicate-check which returns a different vision already linked.
+      mockPrisma.vision.findFirst
+        .mockResolvedValueOnce(mockVision)
+        .mockResolvedValueOnce({ id: 'another-vision-123' });
       mockPrisma.reflectionSession.findFirst.mockResolvedValue(mockReflectionSession);
-      mockPrisma.vision.findUnique.mockResolvedValue({ id: 'another-vision-123' });
 
       const result = await service.updateVision('firebase-uid-123', 'vision-123', 'session-123');
 

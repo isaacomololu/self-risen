@@ -93,6 +93,9 @@ describe('WheelOfLifeService', () => {
         create: jest.fn(),
         delete: jest.fn(),
       },
+      visionBoard: {
+        create: jest.fn(),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({

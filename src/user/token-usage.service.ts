@@ -136,7 +136,9 @@ export class TokenUsageService extends BaseService {
         const resetDate = new Date(user.tokenResetDate);
         const daysUntilReset = Math.ceil((resetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         const tokensRemaining = Math.max(0, user.tokenLimitPerMonth - user.tokensUsedThisMonth);
-        const usagePercentage = (user.tokensUsedThisMonth / user.tokenLimitPerMonth) * 100;
+        const usagePercentage = user.tokenLimitPerMonth > 0
+            ? (user.tokensUsedThisMonth / user.tokenLimitPerMonth) * 100
+            : 0;
 
         return {
             tokensUsedThisMonth: user.tokensUsedThisMonth,

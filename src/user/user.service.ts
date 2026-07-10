@@ -104,7 +104,9 @@ export class UserService extends BaseService {
         tokensUsedThisMonth: user.tokensUsedThisMonth,
         tokenLimitPerMonth: user.tokenLimitPerMonth,
         tokensRemaining: Math.max(0, user.tokenLimitPerMonth - user.tokensUsedThisMonth),
-        usagePercentage: Math.round((user.tokensUsedThisMonth / user.tokenLimitPerMonth) * 10000) / 100,
+        usagePercentage: user.tokenLimitPerMonth > 0
+          ? Math.round((user.tokensUsedThisMonth / user.tokenLimitPerMonth) * 10000) / 100
+          : 0,
         resetDate: user.tokenResetDate,
         daysUntilReset,
       }

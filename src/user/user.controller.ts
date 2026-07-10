@@ -51,7 +51,7 @@ export class UserController extends BaseController {
     if (userProfile.isError) throw userProfile.error;
 
     return this.response({
-      message: 'Account Retrived',
+      message: 'Account Retrieved',
       data: userProfile.data,
     })
   }
@@ -81,7 +81,7 @@ export class UserController extends BaseController {
     if (updatedUser.isError) throw updatedUser.error;
 
     return this.response({
-      message: 'Names Updated',
+      message: 'Name Updated',
       data: updatedUser.data,
     })
   }
@@ -94,7 +94,7 @@ export class UserController extends BaseController {
     if (updatedUser.isError) throw updatedUser.error;
 
     return this.response({
-      message: 'Names Updated',
+      message: 'Username Updated',
       data: updatedUser.data,
     })
   }
@@ -261,8 +261,8 @@ export class UserController extends BaseController {
     if (deletedUser.isError) throw deletedUser.error;
 
     return this.response({
-      message: 'Account Updated',
-      data: user.data,
+      message: 'Account Deleted',
+      data: deletedUser.data,
     })
   }
 
@@ -273,7 +273,7 @@ export class UserController extends BaseController {
     if (stats.isError) throw stats.error;
 
     return this.response({
-      message: 'Stats Retrived',
+      message: 'Stats Retrieved',
       data: stats.data,
     })
   }

@@ -139,7 +139,7 @@ describe('ReflectionService', () => {
     };
 
     mockStaterVideosService = {
-      getMusicByName: jest.fn(),
+      getSoundByName: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -229,13 +229,13 @@ describe('ReflectionService', () => {
     it('should create reflection sound when session has none', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.reflectionSession.findFirst.mockResolvedValue({ ...mockSession, reflectionSound: null });
-      mockStaterVideosService.getMusicByName.mockReturnValue(mockMusic);
+      mockStaterVideosService.getSoundByName.mockReturnValue(mockMusic);
       mockPrisma.reflectionSound.create.mockResolvedValue(mockReflectionSound);
 
       const result = await service.createReflectionSound('firebase-uid-123', 'session-123', 'bright-glow');
 
       expect(result.isError).toBe(false);
-      expect(mockStaterVideosService.getMusicByName).toHaveBeenCalledWith('bright-glow');
+      expect(mockStaterVideosService.getSoundByName).toHaveBeenCalledWith('bright-glow');
       expect(mockPrisma.reflectionSound.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           reflectionSessionId: 'session-123',
@@ -251,7 +251,7 @@ describe('ReflectionService', () => {
         ...mockSession,
         reflectionSound: mockReflectionSound,
       });
-      mockStaterVideosService.getMusicByName.mockReturnValue({ url: 'https://storage.com/new-sound.mp3', name: 'bright-glow' });
+      mockStaterVideosService.getSoundByName.mockReturnValue({ url: 'https://storage.com/new-sound.mp3', name: 'bright-glow' });
       mockPrisma.reflectionSound.update.mockResolvedValue({
         ...mockReflectionSound,
         soundUrl: 'https://storage.com/new-sound.mp3',
@@ -276,7 +276,7 @@ describe('ReflectionService', () => {
     it('should return error when sound name not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.reflectionSession.findFirst.mockResolvedValue({ ...mockSession, reflectionSound: null });
-      mockStaterVideosService.getMusicByName.mockReturnValue(null);
+      mockStaterVideosService.getSoundByName.mockReturnValue(null);
 
       const result = await service.createReflectionSound('firebase-uid-123', 'session-123', 'unknown-sound');
 
@@ -524,6 +524,7 @@ describe('ReflectionService', () => {
           detectedDistortion: null,
           primaryEmotion: 'Crisis',
           supportType: 'safety',
+          userContext: 'I am not healthy',
           reflectiveSummary: 'Safety guidance',
           generatedAffirmation: null,
           socraticPivot: null,

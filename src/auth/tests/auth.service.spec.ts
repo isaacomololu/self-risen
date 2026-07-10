@@ -3,7 +3,6 @@ import { ConflictException, NotFoundException, UnauthorizedException } from '@ne
 import { AuthService } from '../auth.service';
 import { DatabaseProvider } from '../../database/database.provider';
 import { INotificationService } from '../../notifications/interfaces/notification.interface';
-import { EmailService } from '../../common/email/email.service';
 import { NotificationChannelTypeEnum, NotificationStatusEnum } from '../../notifications/enums/notification.enum';
 import * as otpUtil from '../utils/otp.util';
 
@@ -47,7 +46,6 @@ describe('AuthService', () => {
   let service: AuthService;
   let mockPrisma: any;
   let mockNotificationService: any;
-  let mockEmailService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -85,16 +83,11 @@ describe('AuthService', () => {
       notifyExternalUser: jest.fn(),
     };
 
-    mockEmailService = {
-      sendPasswordResetConfirmation: jest.fn(),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: DatabaseProvider, useValue: mockPrisma },
         { provide: INotificationService, useValue: mockNotificationService },
-        { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
 
@@ -624,7 +617,6 @@ describe('AuthService', () => {
       mockFirebaseAuth.updateUser.mockResolvedValue({});
       mockPrisma.passwordResetOtp.update.mockResolvedValue({});
       mockFirebaseAuth.revokeRefreshTokens.mockResolvedValue(undefined);
-      mockEmailService.sendPasswordResetConfirmation.mockResolvedValue(undefined);
 
       const result = await service.resetPassword(resetPasswordPayload);
 

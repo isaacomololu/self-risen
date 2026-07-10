@@ -11,6 +11,7 @@ import {
   VerifyPasswordResetOtpDto,
   GoogleSignInDto,
   AppleSignInDto,
+  FacebookSignInDto,
 } from './dto';
 import { BaseController, AuthGuard, FirebaseUser } from 'src/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -150,6 +151,18 @@ export class AuthController extends BaseController {
 
     return this.response({
       message: 'Google sign-in successful',
+      data: result.data,
+    });
+  }
+
+  @Post('signin/facebook')
+  @ApiOperation({ summary: 'Sign in with Facebook using a Facebook access token (Facebook Login)' })
+  async signInWithFacebook(@Body() form: FacebookSignInDto) {
+    const result = await this.authService.signInWithFacebook(form);
+    if (result.isError) throw result.error;
+
+    return this.response({
+      message: 'Facebook sign-in successful',
       data: result.data,
     });
   }

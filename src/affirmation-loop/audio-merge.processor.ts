@@ -219,6 +219,28 @@ export class AudioMergeProcessor {
                     data: { loopTokensRemaining: { increment: 1 } },
                 }),
             ]);
+
+            try {
+                await this.notificationService.notifyUser({
+                    userId: loop.userId,
+                    type: NotificationTypeEnum.AFFIRMATION_LOOP_FAILED,
+                    requestId: `affirmation-loop-failed-${loopId}-${randomUUID()}`,
+                    channels: [
+                        { type: NotificationChannelTypeEnum.PUSH },
+                        { type: NotificationChannelTypeEnum.IN_APP },
+                    ],
+                    metadata: {
+                        title: 'Loop generation failed',
+                        body: 'Your loop token has been refunded. Please try again.',
+                        loopId,
+                        screen: 'affirmation-loop',
+                    },
+                });
+            } catch (notifyError) {
+                this.logger.warn(
+                    `Failed to send failure notification for loop ${loopId}: ${notifyError.message}`,
+                );
+            }
         } catch (updateError) {
             this.logger.error(
                 `Failed to mark loop ${loopId} as FAILED: ${updateError.message}`,

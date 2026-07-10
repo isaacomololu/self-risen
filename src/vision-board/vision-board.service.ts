@@ -238,58 +238,6 @@ export class VisionBoardService extends BaseService {
         return this.Results(this.mapVisionToResponse(visionItem));
     }
 
-    // async addVisionToGlobalBoard(
-    //     firebaseId: string,
-    //     visionId: string,
-    // ) {
-    //     const user = await this.getUserByFirebaseId(firebaseId);
-    //     if (!user) {
-    //         return this.HandleError(new NotFoundException('User not found'));
-    //     }
-
-    //     const [visionBoard, sourceVision] = await Promise.all([
-    //         this.prisma.visionBoard.findFirst({
-    //             where: {
-    //                 userId: user.id,
-    //                 isGloabal: true,
-    //             },
-    //         }),
-    //         this.prisma.vision.findFirst({
-    //             where: {
-    //                 id: visionId,
-    //                 visionBoard: { userId: user.id },
-    //             },
-    //         }),
-    //     ]);
-
-    //     if (!visionBoard) {
-    //         return this.HandleError(new NotFoundException('Vision board not found'));
-    //     }
-    //     if (!sourceVision) {
-    //         return this.HandleError(new NotFoundException('Vision not found'));
-    //     }
-
-    //     const maxOrderItem = await this.prisma.vision.findFirst({
-    //         where: { visionBoardId: visionBoard.id },
-    //         orderBy: { order: 'desc' },
-    //     });
-    //     const order = maxOrderItem ? (maxOrderItem.order || 0) + 1 : 1;
-
-    //     const visionItem = await this.prisma.vision.create({
-    //         data: {
-    //             visionBoard: { connect: { id: visionBoard.id } },
-    //             order,
-    //             ...(sourceVision.imageUrl && { imageUrl: sourceVision.imageUrl }),
-    //             ...(sourceVision.visionSoundId && {
-    //                 visionSound: { connect: { id: sourceVision.visionSoundId } },
-    //             }),
-    //         },
-    //         include: visionInclude,
-    //     });
-
-    //     return this.Results(this.mapVisionToResponse(visionItem));
-    // }
-
     /**
      * Get all visions for user's vision board (paginated).
      * When includeTotalCount is false, skips the count query for faster responses (e.g. "next page").
@@ -441,19 +389,25 @@ export class VisionBoardService extends BaseService {
 
         // Run image upload and sound lookup in parallel when both are needed
         const oldImageUrl = visionItem.imageUrl;
-        const [uploadResult, sound] = await Promise.all([
-            imageFile
-                ? this.storageService
-                    .uploadFile(imageFile, FileType.IMAGE, user.id, 'vision-board/images')
-                    .then((r) => r.url)
-                    .catch((error) => {
-                        throw new BadRequestException(`Failed to upload image: ${error.message}`);
-                    })
-                : Promise.resolve(undefined),
-            visionSoundId !== undefined && visionSoundId != null && visionSoundId !== ''
-                ? this.prisma.visionSound.findUnique({ where: { id: visionSoundId } })
-                : Promise.resolve(null),
-        ]);
+        let uploadResult: string | undefined;
+        let sound: Awaited<ReturnType<typeof this.prisma.visionSound.findUnique>> | null;
+        try {
+            [uploadResult, sound] = await Promise.all([
+                imageFile
+                    ? this.storageService
+                        .uploadFile(imageFile, FileType.IMAGE, user.id, 'vision-board/images')
+                        .then((r) => r.url)
+                        .catch((error) => {
+                            throw new BadRequestException(`Failed to upload image: ${error.message}`);
+                        })
+                    : Promise.resolve(undefined),
+                visionSoundId !== undefined && visionSoundId != null && visionSoundId !== ''
+                    ? this.prisma.visionSound.findUnique({ where: { id: visionSoundId } })
+                    : Promise.resolve(null),
+            ]);
+        } catch (error) {
+            return this.HandleError(error);
+        }
 
         const imageUrl = uploadResult;
 

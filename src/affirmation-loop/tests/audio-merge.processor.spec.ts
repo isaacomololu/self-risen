@@ -12,6 +12,7 @@ import { StaterVideosService } from 'src/stater-videos/stater-videos.service';
 import { TextToSpeechService } from 'src/reflection/services/text-to-speech.service';
 import { AudioMergeService } from '../audio-merge.service';
 import { INotificationService } from 'src/notifications/interfaces/notification.interface';
+import { NotificationTypeEnum } from 'src/notifications/enums/notification.enum';
 
 describe('AudioMergeProcessor', () => {
     let processor: AudioMergeProcessor;
@@ -19,6 +20,7 @@ describe('AudioMergeProcessor', () => {
     let mockTts: any;
     let mockMerge: any;
     let mockStorage: any;
+    let mockNotification: { notifyUser: jest.Mock };
 
     const baseLoop = {
         id: 'loop-1',
@@ -59,6 +61,8 @@ describe('AudioMergeProcessor', () => {
             }),
         };
 
+        mockNotification = { notifyUser: jest.fn().mockResolvedValue({}) };
+
         mockPrisma = {
             affirmationLoop: {
                 findUnique: jest.fn().mockResolvedValue(baseLoop),
@@ -89,10 +93,7 @@ describe('AudioMergeProcessor', () => {
                 },
                 { provide: TextToSpeechService, useValue: mockTts },
                 { provide: AudioMergeService, useValue: mockMerge },
-                {
-                    provide: INotificationService,
-                    useValue: { notifyUser: jest.fn().mockResolvedValue({}) },
-                },
+                { provide: INotificationService, useValue: mockNotification },
             ],
         }).compile();
 
@@ -132,7 +133,7 @@ describe('AudioMergeProcessor', () => {
         );
     });
 
-    it('refunds token on final failure', async () => {
+    it('refunds token and notifies user on final failure', async () => {
         mockPrisma.affirmationLoop.findUnique.mockResolvedValue({
             userId: 'user-1',
             status: AffirmationLoopStatus.PROCESSING,
@@ -147,6 +148,16 @@ describe('AudioMergeProcessor', () => {
         await processor.onFailed(job, new Error('ffmpeg failed'));
 
         expect(mockPrisma.$transaction).toHaveBeenCalled();
+        expect(mockNotification.notifyUser).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'user-1',
+                type: NotificationTypeEnum.AFFIRMATION_LOOP_FAILED,
+                metadata: expect.objectContaining({
+                    loopId: 'loop-1',
+                    title: 'Loop generation failed',
+                }),
+            }),
+        );
     });
 
     it('does not refund on non-final attempt', async () => {
